@@ -79,5 +79,4 @@ Here are key architectural rules for the global input management system with foc
 
 - Store API keys in environment variables (`.env.local`)
 - Never expose API keys in client-side code
-- Use API routes to proxy requests to Alpaca Markets
 

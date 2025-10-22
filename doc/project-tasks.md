@@ -3,7 +3,7 @@
 ## Implementation Tasks
 1. Set up a new  project with TypeScript 
 2. Install and configure required dependencies 
-3. Create API routes to securely proxy requests to Alpaca Markets
+3. Create API wrapper methods to  requests to Alpaca Markets
 4. Build the option chain display component
 5. Implement the expiration date selection component
 6. Add error handling and loading states
@@ -30,12 +30,12 @@
 
 ## Implementation Details
 
-### 1. API Routes
+### 1. API Wrapper methods
 
-Create two API routes:
-- `/api/options` - Fetches option chain data for a given symbol and expiration date
-- `/api/expirations` - Fetches available expiration dates for a given symbol
-- `/api/quote` - Get Stock quote
+Create  API wrapper:
+- `ApiOptions` - Fetches option chain data for a given symbol and expiration date
+- `ApiExpirations` - Fetches available expiration dates for a given symbol
+- `ApiQuote` - Get Stock quote
 -
 
 ### 2. Components
@@ -58,7 +58,6 @@ The application should:
 
 - Store API keys in environment variables (`.env.local`)
 - Never expose API keys in client-side code
-- Use API routes to proxy requests to Alpaca Markets
 
 
 ## Further Enhancements
