@@ -72,7 +72,14 @@ function getCenteredStrikes(
  */
 function formatNumber(value: number | undefined, decimals: number = 2): string {
   if (value === undefined || value === null) return '-';
-  return value.toFixed(decimals);
+
+  // Handle non-number types (API might return strings)
+  const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+
+  // Check if conversion resulted in valid number
+  if (isNaN(numValue)) return '-';
+
+  return numValue.toFixed(decimals);
 }
 
 /**
@@ -80,8 +87,15 @@ function formatNumber(value: number | undefined, decimals: number = 2): string {
  */
 function formatGreek(value: number | undefined, decimals: number = 4): string {
   if (value === undefined || value === null) return '-';
-  const formatted = value.toFixed(decimals);
-  return value >= 0 ? ` ${formatted}` : formatted;
+
+  // Handle non-number types (API might return strings)
+  const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+
+  // Check if conversion resulted in valid number
+  if (isNaN(numValue)) return '-';
+
+  const formatted = numValue.toFixed(decimals);
+  return numValue >= 0 ? ` ${formatted}` : formatted;
 }
 
 /**
