@@ -8,7 +8,13 @@ export type AppMode = 'navigation' | 'input' | 'command';
 /**
  * Screen types for navigation
  */
-export type ScreenType = 'home' | 'optionChain' | 'strategies' | 'help' | 'settings';
+export type ScreenType =
+  | 'home'              // Landing page
+  | 'symbolDetail'      // Stock quote + expiration selector + compact saved strategies
+  | 'optionChainView'   // Full dedicated option chain display
+  | 'savedStrategies'   // Full screen saved strategies management
+  | 'help'              // Help screen
+  | 'settings';         // Settings screen
 
 /**
  * Status message types

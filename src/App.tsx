@@ -6,11 +6,13 @@ import { AppProvider, useAppContext } from './context/AppContext.js';
 import { Header } from './components/Header.js';
 import { StatusBar } from './components/StatusBar.js';
 import { HomeScreen } from './screens/HomeScreen.js';
+import { SymbolDetailScreen } from './screens/SymbolDetailScreen.js';
+import { OptionChainViewScreen } from './screens/OptionChainViewScreen.js';
+import { SavedStrategiesScreen } from './screens/SavedStrategiesScreen.js';
 import { OptionChainScreen } from './screens/OptionChainScreen.js';
 import { TerminalSizeWarning } from './components/TerminalSizeWarning.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
-import { createBullCallSpread } from './utils/strategies.js';
 import { useTerminalSize, calculateSafeDisplayLimit } from './hooks/useTerminalSize.js';
 
 // Navigation state context for option chain screen
@@ -69,19 +71,13 @@ function GlobalInputHandler() {
     inputBuffer,
     availableExpirations,
     displayLimit,
-    strategyBuilderActive,
-    builderStep,
-    selectedLongCall,
-    selectedShortCall,
     optionChain,
   } = state;
 
   // Get navigation state for option chain screen
   const {
-    optionChainFocus,
     highlightedIndex,
     showGreeks,
-    setOptionChainFocus,
     setHighlightedIndex,
     setShowGreeks,
   } = useNavigation();
@@ -172,7 +168,130 @@ function GlobalInputHandler() {
       }
     }
 
-    // Option chain screen navigation
+    // Symbol Detail screen navigation
+    if (currentScreen === 'symbolDetail') {
+      // Navigation keys for expiration selector
+      if (key.upArrow || input === 'k') {
+        setHighlightedIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.downArrow || input === 'j') {
+        const maxIndex = availableExpirations.length - 1;
+        setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
+      }
+
+      // View full option chain
+      else if (input === 'o') {
+        if (optionChain) {
+          dispatch({ type: 'SET_SCREEN', payload: 'optionChainView' });
+          setHighlightedIndex(0);
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Option Chain View', type: 'info' } });
+        } else {
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Select an expiration date first', type: 'warning' } });
+        }
+      }
+
+      // Activate strategy builder
+      else if (input === 'b') {
+        if (optionChain && optionChain.calls.length > 0) {
+          logger.info('🏗️ Activating Bull Call Spread Builder');
+          dispatch({ type: 'ACTIVATE_STRATEGY_BUILDER' });
+          setHighlightedIndex(0);
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Bull Call Spread Builder: Select LONG call (buy)', type: 'info' } });
+        } else {
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Load option chain first (select expiration)', type: 'warning' } });
+        }
+      }
+
+      // View saved strategies
+      else if (input === 'v') {
+        dispatch({ type: 'SET_SCREEN', payload: 'savedStrategies' });
+        setHighlightedIndex(0);
+        dispatch({ type: 'SET_STATUS', payload: { message: 'Saved Strategies', type: 'info' } });
+      }
+
+      // Symbol entry
+      else if (input === 's') {
+        dispatch({ type: 'SET_MODE', payload: 'input' });
+        dispatch({ type: 'SET_STATUS', payload: { message: 'Enter stock symbol', type: 'info' } });
+      }
+
+      // Go back to home
+      else if (input === 'q') {
+        dispatch({ type: 'GO_BACK' });
+        setHighlightedIndex(0);
+      }
+    }
+
+    // Option Chain View screen navigation
+    if (currentScreen === 'optionChainView') {
+      // Navigation keys
+      if (key.upArrow || input === 'k') {
+        setHighlightedIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.downArrow || input === 'j') {
+        setHighlightedIndex((prev) => prev + 1);
+      }
+
+      // Display limit cycling
+      else if (input === 'l') {
+        const limits = [10, 40, -1]; // -1 means ALL
+        const currentIndex = limits.indexOf(displayLimit);
+        const nextIndex = (currentIndex + 1) % limits.length;
+        const newLimit = limits[nextIndex]!;
+        dispatch({ type: 'SET_DISPLAY_LIMIT', payload: newLimit });
+        dispatch({
+          type: 'SET_STATUS',
+          payload: { message: `Display limit: ${newLimit === -1 ? 'ALL' : newLimit}`, type: 'success' },
+        });
+      }
+
+      // Toggle Greeks
+      else if (input === 'g') {
+        setShowGreeks((prev) => !prev);
+        dispatch({
+          type: 'SET_STATUS',
+          payload: { message: `Greeks ${showGreeks ? 'hidden' : 'visible'}`, type: 'info' },
+        });
+      }
+
+      // Go back
+      else if (input === 'q') {
+        dispatch({ type: 'GO_BACK' });
+        setHighlightedIndex(0);
+      }
+    }
+
+    // Saved Strategies screen navigation
+    if (currentScreen === 'savedStrategies') {
+      // Navigation keys
+      if (key.upArrow || input === 'k') {
+        setHighlightedIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.downArrow || input === 'j') {
+        const maxIndex = state.savedStrategies.length - 1;
+        setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
+      }
+
+      // Delete strategy
+      else if (input === 'x') {
+        const strategy = state.savedStrategies[highlightedIndex];
+        if (strategy) {
+          dispatch({ type: 'REMOVE_STRATEGY', payload: strategy.id });
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy removed', type: 'success' } });
+          // Adjust highlighted index if needed
+          if (highlightedIndex >= state.savedStrategies.length - 1) {
+            setHighlightedIndex(Math.max(0, state.savedStrategies.length - 2));
+          }
+        }
+      }
+
+      // Go back
+      else if (input === 'q') {
+        dispatch({ type: 'GO_BACK' });
+        setHighlightedIndex(0);
+      }
+    }
+
+    // Legacy optionChain screen navigation (kept for backward compatibility if needed)
+    // This is now handled by symbolDetail + strategy builder modal
+    /*
     if (currentScreen === 'optionChain') {
       // Strategy Builder Mode
       if (strategyBuilderActive) {
@@ -315,6 +434,7 @@ function GlobalInputHandler() {
         }
       }
     }
+    */
   });
 
   // Symbol entry handler
@@ -335,8 +455,8 @@ function GlobalInputHandler() {
         const expirations = await client.getExpirationDates(symbol);
         if (expirations) {
           dispatch({ type: 'SET_AVAILABLE_EXPIRATIONS', payload: expirations.dates });
-          // Switch to option chain screen
-          dispatch({ type: 'SET_SCREEN', payload: 'optionChain' });
+          // Switch to symbol detail screen
+          dispatch({ type: 'SET_SCREEN', payload: 'symbolDetail' });
         }
       } else {
         dispatch({ type: 'SET_STATUS', payload: { message: `Failed to fetch quote for ${symbol}`, type: 'error' } });
@@ -357,7 +477,7 @@ function GlobalInputHandler() {
  */
 function AppContent() {
   const { state, dispatch } = useAppContext();
-  const { optionChainFocus, highlightedIndex, showGreeks, setHighlightedIndex } = useNavigation();
+  const { highlightedIndex, showGreeks, setHighlightedIndex } = useNavigation();
   const terminalSize = useTerminalSize();
 
   // Auto-adjust display limit based on terminal size
@@ -398,10 +518,23 @@ function AppContent() {
 
       {/* Main content area */}
       <Box flexGrow={1} flexDirection="column">
+        {/* Home Screen */}
         {state.currentScreen === 'home' && <HomeScreen />}
-        {state.currentScreen === 'optionChain' && (
+
+        {/* Symbol Detail Screen */}
+        {state.currentScreen === 'symbolDetail' && !state.strategyBuilderActive && (
+          <SymbolDetailScreen
+            highlightedIndex={highlightedIndex}
+            onExpirationSelect={() => {
+              // Expiration selected, could auto-navigate to option chain view if desired
+            }}
+          />
+        )}
+
+        {/* Strategy Builder Modal (overlays Symbol Detail) */}
+        {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && (
           <OptionChainScreen
-            currentFocus={optionChainFocus}
+            currentFocus={'expiration'}
             highlightedIndex={highlightedIndex}
             showGreeks={showGreeks}
             strategyBuilderActive={state.strategyBuilderActive}
@@ -415,35 +548,84 @@ function AppContent() {
                 setHighlightedIndex((prev) => prev + 1);
               }
             }}
-            onChangeFocus={(focus) => {
-              // Handle focus changes if needed
-              logger.debug(`Focus changed to: ${focus}`);
+            onChangeFocus={(_focus) => {
+              // Strategy builder doesn't change focus
             }}
           />
         )}
-        {/* Additional screens will be added here */}
+
+        {/* Option Chain View Screen */}
+        {state.currentScreen === 'optionChainView' && (
+          <OptionChainViewScreen
+            highlightedRow={highlightedIndex}
+            showGreeks={showGreeks}
+            displayLimit={state.displayLimit}
+          />
+        )}
+
+        {/* Saved Strategies Screen */}
+        {state.currentScreen === 'savedStrategies' && (
+          <SavedStrategiesScreen
+            highlightedIndex={highlightedIndex}
+            onRemove={(strategyId) => {
+              dispatch({ type: 'REMOVE_STRATEGY', payload: strategyId });
+            }}
+          />
+        )}
+
       </Box>
 
-      {/* Keyboard shortcuts help */}
+      {/* Keyboard shortcuts help - Context-aware */}
       <Box paddingX={1} marginTop={1}>
         <Box marginRight={2}>
           <Text dimColor>
-            <Text bold color="cyan">s</Text> Symbol{' '}
-            {state.currentScreen === 'optionChain' && !state.strategyBuilderActive && (
+            {/* Home screen */}
+            {state.currentScreen === 'home' && (
               <>
-                <Text bold color="cyan">b</Text> Build Strategy{' '}
-                <Text bold color="cyan">v</Text> View Strategies{' '}
+                <Text bold color="cyan">s</Text> Symbol{' '}
+                <Text bold color="cyan">h/?</Text> Help{' '}
+                <Text bold color="cyan">q</Text> Quit
               </>
             )}
+
+            {/* Symbol Detail screen */}
+            {state.currentScreen === 'symbolDetail' && !state.strategyBuilderActive && (
+              <>
+                <Text bold color="cyan">o</Text> Option Chain{' '}
+                <Text bold color="cyan">b</Text> Build Strategy{' '}
+                <Text bold color="cyan">v</Text> Strategies{' '}
+                <Text bold color="cyan">s</Text> Symbol{' '}
+                <Text bold color="cyan">q</Text> Back
+              </>
+            )}
+
+            {/* Strategy Builder (modal) */}
             {state.strategyBuilderActive && (
               <>
                 <Text bold color="cyan">↑↓/j/k</Text> Navigate{' '}
                 <Text bold color="cyan">Enter</Text> Select{' '}
-                <Text bold color="cyan">Esc</Text> Cancel{' '}
+                <Text bold color="cyan">Esc</Text> Cancel
               </>
             )}
-            <Text bold color="cyan">h/?</Text> Help{' '}
-            <Text bold color="cyan">q</Text> Quit
+
+            {/* Option Chain View screen */}
+            {state.currentScreen === 'optionChainView' && (
+              <>
+                <Text bold color="cyan">↑↓/j/k</Text> Navigate{' '}
+                <Text bold color="cyan">l</Text> Limit{' '}
+                <Text bold color="cyan">g</Text> Greeks{' '}
+                <Text bold color="cyan">q</Text> Back
+              </>
+            )}
+
+            {/* Saved Strategies screen */}
+            {state.currentScreen === 'savedStrategies' && (
+              <>
+                <Text bold color="cyan">↑↓/j/k</Text> Navigate{' '}
+                <Text bold color="cyan">x</Text> Delete{' '}
+                <Text bold color="cyan">q</Text> Back
+              </>
+            )}
           </Text>
         </Box>
       </Box>
