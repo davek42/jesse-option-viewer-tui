@@ -10,6 +10,10 @@ import { logger } from './utils/logger.js';
 logger.info('🚀 Starting Option Viewer TUI...');
 logger.info(`📄 Log file: ${logger.getLogFilePath()}`);
 
+// Clear the terminal screen to remove npm startup messages
+// This provides a clean slate for the TUI application
+process.stdout.write('\x1Bc');
+
 // Render the application
 const { unmount, waitUntilExit } = render(<App />);
 
