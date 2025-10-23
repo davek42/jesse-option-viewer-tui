@@ -130,6 +130,12 @@ export interface AppState {
   displayLimit: number; // 10, 40, or -1 for ALL
   loading: boolean;
   error: string | null;
+
+  // Strategy builder state
+  strategyBuilderActive: boolean;
+  builderStep: 'long' | 'short';
+  selectedLongCall: OptionContract | null;
+  selectedShortCall: OptionContract | null;
 }
 
 /**
@@ -155,4 +161,9 @@ export type AppAction =
   | { type: 'REMOVE_STRATEGY'; payload: string }
   | { type: 'SET_DISPLAY_LIMIT'; payload: number }
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null };
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'ACTIVATE_STRATEGY_BUILDER' }
+  | { type: 'DEACTIVATE_STRATEGY_BUILDER' }
+  | { type: 'SET_BUILDER_STEP'; payload: 'long' | 'short' }
+  | { type: 'SET_LONG_CALL'; payload: OptionContract | null }
+  | { type: 'SET_SHORT_CALL'; payload: OptionContract | null };

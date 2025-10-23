@@ -37,6 +37,12 @@ const initialState: AppState = {
   displayLimit: 40, // Default to 40 lines
   loading: false,
   error: null,
+
+  // Strategy builder state
+  strategyBuilderActive: false,
+  builderStep: 'long',
+  selectedLongCall: null,
+  selectedShortCall: null,
 };
 
 /**
@@ -206,6 +212,43 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         error: action.payload,
+      };
+
+    // Strategy builder actions
+    case 'ACTIVATE_STRATEGY_BUILDER':
+      return {
+        ...state,
+        strategyBuilderActive: true,
+        builderStep: 'long',
+        selectedLongCall: null,
+        selectedShortCall: null,
+      };
+
+    case 'DEACTIVATE_STRATEGY_BUILDER':
+      return {
+        ...state,
+        strategyBuilderActive: false,
+        builderStep: 'long',
+        selectedLongCall: null,
+        selectedShortCall: null,
+      };
+
+    case 'SET_BUILDER_STEP':
+      return {
+        ...state,
+        builderStep: action.payload,
+      };
+
+    case 'SET_LONG_CALL':
+      return {
+        ...state,
+        selectedLongCall: action.payload,
+      };
+
+    case 'SET_SHORT_CALL':
+      return {
+        ...state,
+        selectedShortCall: action.payload,
       };
 
     default:
