@@ -11,6 +11,7 @@ import { OptionChainViewScreen } from './screens/OptionChainViewScreen.js';
 import { SavedStrategiesScreen } from './screens/SavedStrategiesScreen.js';
 import { OptionChainScreen } from './screens/OptionChainScreen.js';
 import { TerminalSizeWarning } from './components/TerminalSizeWarning.js';
+import { getATMIndex } from './components/OptionChain.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
 import { useTerminalSize, calculateSafeDisplayLimit } from './hooks/useTerminalSize.js';
@@ -214,6 +215,12 @@ function GlobalInputHandler() {
 
             if (chain) {
               dispatch({ type: 'SET_OPTION_CHAIN', payload: chain });
+
+              // Auto-center on ATM strike (Phase 3.1)
+              const atmIndex = getATMIndex(chain.calls, chain.puts, chain.underlyingPrice, displayLimit);
+              setHighlightedIndex(atmIndex);
+              logger.info(`🎯 Auto-centered on ATM strike (index ${atmIndex})`);
+
               dispatch({
                 type: 'SET_STATUS',
                 payload: {
@@ -245,7 +252,11 @@ function GlobalInputHandler() {
       else if (input === 'o') {
         if (optionChain) {
           dispatch({ type: 'SET_SCREEN', payload: 'optionChainView' });
-          setHighlightedIndex(0);
+
+          // Auto-center on ATM strike (Phase 3.1)
+          const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
+          setHighlightedIndex(atmIndex);
+
           dispatch({ type: 'SET_STATUS', payload: { message: 'Option Chain View', type: 'info' } });
         } else {
           dispatch({ type: 'SET_STATUS', payload: { message: 'Select an expiration date first', type: 'warning' } });

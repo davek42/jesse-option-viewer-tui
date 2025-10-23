@@ -43,6 +43,30 @@ function findATMStrike(calls: OptionContract[], puts: OptionContract[], stockPri
 }
 
 /**
+ * Get the index of the ATM strike in the displayed strikes array
+ * Use this to auto-center the option chain view on the ATM strike
+ *
+ * @param calls - Array of call options
+ * @param puts - Array of put options
+ * @param stockPrice - Current underlying stock price
+ * @param displayLimit - Display limit (10, 40, or -1 for all)
+ * @returns Index of ATM strike in the display array (for setting highlightedRow)
+ */
+export function getATMIndex(
+  calls: OptionContract[],
+  puts: OptionContract[],
+  stockPrice: number,
+  displayLimit: number
+): number {
+  const displayStrikes = getCenteredStrikes(calls, puts, stockPrice, displayLimit);
+  const atmStrike = findATMStrike(calls, puts, stockPrice);
+  const atmIndex = displayStrikes.indexOf(atmStrike);
+
+  // If ATM strike not found in display, return middle of display
+  return atmIndex !== -1 ? atmIndex : Math.floor(displayStrikes.length / 2);
+}
+
+/**
  * Get centered strikes around ATM for display
  */
 function getCenteredStrikes(
