@@ -5,10 +5,14 @@ import { Box, Text } from 'ink';
 import { useAppContext } from '../context/AppContext.js';
 import { ExpirationSelect } from '../components/ExpirationSelect.js';
 import { OptionChain } from '../components/OptionChain.js';
+import { SavedStrategies } from '../components/SavedStrategies.js';
+import { StrategyBuilder } from '../components/StrategyBuilder.js';
 import { getAlpacaClient } from '../lib/alpaca.js';
 import { logger } from '../utils/logger.js';
+import { createBullCallSpread } from '../utils/strategies.js';
+import type { OptionContract } from '../types/index.js';
 
-type FocusArea = 'expiration' | 'optionChain';
+type FocusArea = 'expiration' | 'optionChain' | 'strategies' | 'builder';
 
 interface OptionChainScreenProps {
   /** Current focus area for keyboard navigation */
@@ -19,6 +23,18 @@ interface OptionChainScreenProps {
 
   /** Whether to show Greeks in option chain */
   showGreeks?: boolean;
+
+  /** Whether strategy builder mode is active */
+  strategyBuilderActive?: boolean;
+
+  /** Current builder selection step */
+  builderStep?: 'long' | 'short';
+
+  /** Selected long call for strategy */
+  selectedLongCall?: OptionContract | null;
+
+  /** Selected short call for strategy */
+  selectedShortCall?: OptionContract | null;
 
   /** Callback when user navigates */
   onNavigate?: (direction: 'up' | 'down') => void;
@@ -40,6 +56,10 @@ export function OptionChainScreen({
   currentFocus = 'expiration',
   highlightedIndex = 0,
   showGreeks = true,
+  strategyBuilderActive = false,
+  builderStep = 'long',
+  selectedLongCall = null,
+  selectedShortCall = null,
   onNavigate: _onNavigate,
   onSelect: _onSelect,
   onChangeFocus,
@@ -52,6 +72,7 @@ export function OptionChainScreen({
     availableExpirations,
     selectedExpiration,
     optionChain,
+    savedStrategies,
     loading,
     error,
     displayLimit,
@@ -66,6 +87,34 @@ export function OptionChainScreen({
       }
     }
   }, [availableExpirations, selectedExpiration]);
+
+  /**
+   * Handle strategy save
+   */
+  function handleStrategySave() {
+    if (!currentSymbol || !selectedLongCall || !selectedShortCall) return;
+
+    const strategy = createBullCallSpread(currentSymbol, selectedLongCall, selectedShortCall, 1);
+    if (strategy) {
+      dispatch({ type: 'ADD_STRATEGY', payload: strategy });
+      dispatch({
+        type: 'SET_STATUS',
+        payload: { message: '✓ Bull Call Spread saved!', type: 'success' },
+      });
+      logger.success(`💼 Strategy saved: ${strategy.type} for ${currentSymbol}`);
+    }
+  }
+
+  /**
+   * Handle strategy removal
+   */
+  function handleStrategyRemove(strategyId: string) {
+    dispatch({ type: 'REMOVE_STRATEGY', payload: strategyId });
+    dispatch({
+      type: 'SET_STATUS',
+      payload: { message: 'Strategy removed', type: 'info' },
+    });
+  }
 
   /**
    * Handle expiration date selection
@@ -176,6 +225,33 @@ export function OptionChainScreen({
           <Box marginLeft={2}>
             <Text dimColor>Vol: {stockQuote.volume.toLocaleString()}</Text>
           </Box>
+        </Box>
+      )}
+
+      {/* Saved Strategies (Task #8) - Display below stock quote */}
+      <Box marginBottom={2}>
+        <SavedStrategies
+          strategies={savedStrategies}
+          onRemove={handleStrategyRemove}
+          highlightedIndex={currentFocus === 'strategies' ? highlightedIndex : 0}
+          isFocused={currentFocus === 'strategies'}
+        />
+      </Box>
+
+      {/* Strategy Builder (Task #7) - Bull Call Spread */}
+      {strategyBuilderActive && optionChain && (
+        <Box marginBottom={2}>
+          <StrategyBuilder
+            calls={optionChain.calls}
+            longCall={selectedLongCall}
+            shortCall={selectedShortCall}
+            selectionStep={builderStep}
+            highlightedIndex={highlightedIndex}
+            quantity={1}
+            onSelectOption={() => {}} // Handled by global input handler
+            onConfirm={handleStrategySave}
+            onCancel={() => {}} // Handled by global input handler
+          />
         </Box>
       )}
 
