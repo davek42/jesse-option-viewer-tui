@@ -13,8 +13,8 @@
   - It should show the type, strike prices, max loss, max gain, break even prices.
   - It should be similar to a spreadsheet layout.
   - In the option strategy area there should be a button to save the strategy. On saving it should display
-9. For the Option Chain display add a drop to down to limit the number lines displayed
-  - The drop down should have have choices of 10,40, and ALL
+9. For the Option Chain display should limit the number lines displayed
+  - A command should have have choices of 10,40, and ALL
   - The prices should be center around the option with the CALL and PUT strike price closest to the current stock quote. 
     - Example: If AAPL has stock quote of 200 then the Option Chain prices should be centered around the strike 200
 10. Implement the option strategy selection for Bear Put Spread
