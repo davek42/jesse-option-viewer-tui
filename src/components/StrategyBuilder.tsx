@@ -4,21 +4,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { OptionContract } from '../types/index.js';
 import { calculateBullCallSpread, formatCurrency, formatPercentage } from '../utils/strategies.js';
-
-/**
- * Safely format a number with toFixed, handling string values from API
- */
-function safeToFixed(value: number | undefined, decimals: number = 2): string {
-  if (value === undefined || value === null) return '-';
-
-  // Handle non-number types (API might return strings)
-  const numValue = typeof value === 'number' ? value : parseFloat(String(value));
-
-  // Check if conversion resulted in valid number
-  if (isNaN(numValue)) return '-';
-
-  return numValue.toFixed(decimals);
-}
+import { safeToFixed } from '../utils/formatters.js';
 
 interface StrategyBuilderProps {
   /** Available call options for building the spread */

@@ -3,6 +3,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { OptionChain as OptionChainType, OptionContract } from '../types/index.js';
+import { safeToFixed, formatGreek } from '../utils/formatters.js';
 
 interface OptionChainProps {
   /** Option chain data containing calls and puts */
@@ -67,36 +68,6 @@ function getCenteredStrikes(
   return allStrikes.slice(startIndex, endIndex);
 }
 
-/**
- * Format number for display with appropriate precision
- */
-function formatNumber(value: number | undefined, decimals: number = 2): string {
-  if (value === undefined || value === null) return '-';
-
-  // Handle non-number types (API might return strings)
-  const numValue = typeof value === 'number' ? value : parseFloat(String(value));
-
-  // Check if conversion resulted in valid number
-  if (isNaN(numValue)) return '-';
-
-  return numValue.toFixed(decimals);
-}
-
-/**
- * Format Greek value with sign and color
- */
-function formatGreek(value: number | undefined, decimals: number = 4): string {
-  if (value === undefined || value === null) return '-';
-
-  // Handle non-number types (API might return strings)
-  const numValue = typeof value === 'number' ? value : parseFloat(String(value));
-
-  // Check if conversion resulted in valid number
-  if (isNaN(numValue)) return '-';
-
-  const formatted = numValue.toFixed(decimals);
-  return numValue >= 0 ? ` ${formatted}` : formatted;
-}
 
 /**
  * OptionChain Component
@@ -248,17 +219,17 @@ export function OptionChain({
                   <>
                     <Box width={8}>
                       <Text color={textColor} backgroundColor={bgColor}>
-                        {formatNumber(call.bid)}
+                        {safeToFixed(call.bid, 2)}
                       </Text>
                     </Box>
                     <Box width={8}>
                       <Text color={textColor} backgroundColor={bgColor}>
-                        {formatNumber(call.ask)}
+                        {safeToFixed(call.ask, 2)}
                       </Text>
                     </Box>
                     <Box width={9}>
                       <Text color={textColor} backgroundColor={bgColor} bold>
-                        {formatNumber(call.lastPrice)}
+                        {safeToFixed(call.lastPrice, 2)}
                       </Text>
                     </Box>
                     <Box width={9}>
@@ -327,17 +298,17 @@ export function OptionChain({
                     </Box>
                     <Box width={9}>
                       <Text color={textColor} backgroundColor={bgColor} bold>
-                        {formatNumber(put.lastPrice)}
+                        {safeToFixed(put.lastPrice, 2)}
                       </Text>
                     </Box>
                     <Box width={8}>
                       <Text color={textColor} backgroundColor={bgColor}>
-                        {formatNumber(put.ask)}
+                        {safeToFixed(put.ask, 2)}
                       </Text>
                     </Box>
                     <Box width={8}>
                       <Text color={textColor} backgroundColor={bgColor}>
-                        {formatNumber(put.bid)}
+                        {safeToFixed(put.bid, 2)}
                       </Text>
                     </Box>
                   </>
