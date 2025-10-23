@@ -5,6 +5,21 @@ import { Box, Text } from 'ink';
 import type { OptionContract } from '../types/index.js';
 import { calculateBullCallSpread, formatCurrency, formatPercentage } from '../utils/strategies.js';
 
+/**
+ * Safely format a number with toFixed, handling string values from API
+ */
+function safeToFixed(value: number | undefined, decimals: number = 2): string {
+  if (value === undefined || value === null) return '-';
+
+  // Handle non-number types (API might return strings)
+  const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+
+  // Check if conversion resulted in valid number
+  if (isNaN(numValue)) return '-';
+
+  return numValue.toFixed(decimals);
+}
+
 interface StrategyBuilderProps {
   /** Available call options for building the spread */
   calls: OptionContract[];
@@ -99,7 +114,7 @@ export function StrategyBuilder({
           <Box>
             {longCall ? (
               <Text color="green">
-                ✓ BUY ${longCall.strikePrice} @ ${longCall.ask.toFixed(2)}
+                ✓ BUY ${safeToFixed(longCall.strikePrice, 2)} @ ${safeToFixed(longCall.ask, 2)}
               </Text>
             ) : (
               <Text dimColor>Not selected</Text>
@@ -113,7 +128,7 @@ export function StrategyBuilder({
           <Box>
             {shortCall ? (
               <Text color="red">
-                ✓ SELL ${shortCall.strikePrice} @ ${shortCall.bid.toFixed(2)}
+                ✓ SELL ${safeToFixed(shortCall.strikePrice, 2)} @ ${safeToFixed(shortCall.bid, 2)}
               </Text>
             ) : (
               <Text dimColor>Not selected</Text>
@@ -168,22 +183,22 @@ export function StrategyBuilder({
               <Box key={call.symbol}>
                 <Box width={12}>
                   <Text color={textColor} backgroundColor={bgColor} bold={isHighlighted}>
-                    {isHighlighted ? '▶ ' : '  '}${call.strikePrice.toFixed(2)}
+                    {isHighlighted ? '▶ ' : '  '}${safeToFixed(call.strikePrice, 2)}
                   </Text>
                 </Box>
                 <Box width={10}>
                   <Text color={textColor} backgroundColor={bgColor}>
-                    ${(selectionStep === 'long' ? call.ask : call.bid).toFixed(2)}
+                    ${safeToFixed(selectionStep === 'long' ? call.ask : call.bid, 2)}
                   </Text>
                 </Box>
                 <Box width={10}>
                   <Text color={textColor} backgroundColor={bgColor}>
-                    ${call.lastPrice.toFixed(2)}
+                    ${safeToFixed(call.lastPrice, 2)}
                   </Text>
                 </Box>
                 <Box width={10}>
                   <Text color={textColor} backgroundColor={bgColor}>
-                    {call.delta !== undefined ? call.delta.toFixed(3) : '-'}
+                    {safeToFixed(call.delta, 3)}
                   </Text>
                 </Box>
                 <Box width={10}>
@@ -231,7 +246,7 @@ export function StrategyBuilder({
               <Box width={20}>
                 <Text bold>Break Even:</Text>
               </Box>
-              <Text>${metrics.breakEven.toFixed(2)}</Text>
+              <Text>${safeToFixed(metrics.breakEven, 2)}</Text>
             </Box>
             <Box>
               <Box width={20}>
@@ -243,7 +258,7 @@ export function StrategyBuilder({
               <Box width={20}>
                 <Text bold>Risk/Reward:</Text>
               </Box>
-              <Text>1:{metrics.riskRewardRatio.toFixed(2)}</Text>
+              <Text>1:{safeToFixed(metrics.riskRewardRatio, 2)}</Text>
             </Box>
           </Box>
 
