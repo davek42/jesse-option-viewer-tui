@@ -340,6 +340,8 @@ function GlobalInputHandler() {
 
       // Go back to home
       else if (input === 'q') {
+        // Clear screen before going back (Phase 3.3 - Fix screen overlap)
+        process.stdout.write('\x1Bc');
         dispatch({ type: 'GO_BACK' });
         setHighlightedIndex(0);
       }
@@ -403,6 +405,8 @@ function GlobalInputHandler() {
 
       // Go back
       else if (input === 'q') {
+        // Clear screen before going back (Phase 3.3 - Fix screen overlap)
+        process.stdout.write('\x1Bc');
         dispatch({ type: 'GO_BACK' });
         setHighlightedIndex(0);
       }
@@ -433,6 +437,8 @@ function GlobalInputHandler() {
 
       // Go back
       else if (input === 'q') {
+        // Clear screen before going back (Phase 3.3 - Fix screen overlap)
+        process.stdout.write('\x1Bc');
         dispatch({ type: 'GO_BACK' });
         setHighlightedIndex(0);
       }
