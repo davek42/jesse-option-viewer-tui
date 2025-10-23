@@ -106,8 +106,58 @@ function GlobalInputHandler() {
       }
 
       if (key.return) {
-        // Execute command (to be implemented)
-        logger.debug('Command entered:', state.commandBuffer);
+        // Execute command
+        const command = state.commandBuffer.toLowerCase().trim();
+        logger.debug('Command entered:', command);
+
+        // Handle slash commands (Phase 3.3)
+        if (command === '/scroll up' || command === '/up') {
+          // Page up - jump 10 strikes
+          if (currentScreen === 'optionChainView' && optionChain) {
+            const newIndex = Math.max(0, highlightedIndex - 10);
+            setHighlightedIndex(newIndex);
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Scrolled up 10 strikes', type: 'info' } });
+          } else {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
+          }
+        } else if (command === '/scroll down' || command === '/down') {
+          // Page down - jump 10 strikes
+          if (currentScreen === 'optionChainView' && optionChain) {
+            setHighlightedIndex((prev) => prev + 10);
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Scrolled down 10 strikes', type: 'info' } });
+          } else {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
+          }
+        } else if (command === '/atm' || command === '/a') {
+          // Jump to ATM
+          if (currentScreen === 'optionChainView' && optionChain) {
+            const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
+            setHighlightedIndex(atmIndex);
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to ATM strike', type: 'success' } });
+          } else {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
+          }
+        } else if (command === '/top' || command === '/t') {
+          // Jump to top (first strike)
+          if (currentScreen === 'optionChainView') {
+            setHighlightedIndex(0);
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to top', type: 'info' } });
+          } else {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
+          }
+        } else if (command === '/bottom' || command === '/b') {
+          // Jump to bottom (last strike)
+          if (currentScreen === 'optionChainView' && optionChain) {
+            const displayStrikes = optionChain.calls.length > 0 ? optionChain.calls.length : 40;
+            setHighlightedIndex(displayStrikes - 1);
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to bottom', type: 'info' } });
+          } else {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
+          }
+        } else if (command.startsWith('/')) {
+          dispatch({ type: 'SET_STATUS', payload: { message: `Unknown command: ${command}`, type: 'error' } });
+        }
+
         dispatch({ type: 'CLEAR_INPUT' });
         dispatch({ type: 'SET_MODE', payload: 'navigation' });
         return;
@@ -297,11 +347,36 @@ function GlobalInputHandler() {
 
     // Option Chain View screen navigation
     if (currentScreen === 'optionChainView') {
-      // Navigation keys
+      // Single-line navigation
       if (key.upArrow || input === 'k') {
         setHighlightedIndex((prev) => Math.max(0, prev - 1));
       } else if (key.downArrow || input === 'j') {
         setHighlightedIndex((prev) => prev + 1);
+      }
+
+      // Jump to ATM (Phase 3.3) - 'a' key
+      else if (input === 'a') {
+        if (optionChain) {
+          const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
+          setHighlightedIndex(atmIndex);
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to ATM strike', type: 'success' } });
+        }
+      }
+
+      // Jump to top (Phase 3.3) - Ctrl+Up
+      else if (key.ctrl && key.upArrow) {
+        setHighlightedIndex(0);
+        dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to top', type: 'info' } });
+      }
+
+      // Jump to bottom (Phase 3.3) - Ctrl+Down
+      else if (key.ctrl && key.downArrow) {
+        if (optionChain) {
+          // Calculate max index based on display
+          const displayStrikes = optionChain.calls.length > 0 ? optionChain.calls.length : 40;
+          setHighlightedIndex(displayStrikes - 1);
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to bottom', type: 'info' } });
+        }
       }
 
       // Display limit cycling

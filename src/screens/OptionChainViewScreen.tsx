@@ -112,13 +112,18 @@ export function OptionChainViewScreen({
         </Box>
       )}
 
-      {/* Footer with keyboard shortcuts */}
-      <Box paddingX={1} marginTop={1}>
+      {/* Footer with keyboard shortcuts (Phase 3.3 - Enhanced Navigation) */}
+      <Box paddingX={1} marginTop={1} flexDirection="column">
         <Text dimColor>
           <Text bold color="cyan">↑↓/j/k</Text> Navigate{' '}
+          <Text bold color="cyan">a</Text> ATM{' '}
+          <Text bold color="cyan">Ctrl+↑↓</Text> Top/Bottom{' '}
           <Text bold color="cyan">l</Text> Limit ({displayLimit === -1 ? 'ALL' : displayLimit}){' '}
           <Text bold color="cyan">g</Text> Greeks{' '}
           <Text bold color="cyan">q</Text> Back
+        </Text>
+        <Text dimColor>
+          <Text bold color="cyan">/</Text> Commands: /atm, /scroll up, /scroll down, /top, /bottom
         </Text>
       </Box>
     </Box>
