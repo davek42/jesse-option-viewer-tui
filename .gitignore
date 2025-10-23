@@ -44,3 +44,4 @@ data/
 
 # Optional eslint cache
 .eslintcache
+/logs

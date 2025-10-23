@@ -1,6 +1,13 @@
 // AIDEV-NOTE: Logging utility with emoji support for better debugging
+// Writes to file to avoid interfering with Ink TUI display
 
 import chalk from 'chalk';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Log levels with associated emojis
@@ -30,13 +37,43 @@ const LOG_COLORS = {
 } as const;
 
 /**
- * Logger class for formatted console output
+ * Logger class for formatted file output
+ * Logs to file to avoid interfering with TUI display
  */
 class Logger {
   private isDevelopment: boolean;
+  private logFilePath: string;
+  private logStream: fs.WriteStream | null = null;
 
   constructor() {
     this.isDevelopment = process.env.NODE_ENV !== 'production';
+
+    // Create logs directory in project root
+    const projectRoot = path.resolve(__dirname, '../..');
+    const logsDir = path.join(projectRoot, 'logs');
+
+    // Ensure logs directory exists
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+
+    // Create log file with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+    this.logFilePath = path.join(logsDir, `option-viewer-${timestamp}.log`);
+
+    // Open write stream
+    this.logStream = fs.createWriteStream(this.logFilePath, { flags: 'a' });
+  }
+
+  /**
+   * Write to log file
+   */
+  private writeToFile(message: string): void {
+    if (this.logStream) {
+      // Strip ANSI color codes for file output
+      const plainMessage = message.replace(/\u001b\[[0-9;]*m/g, '');
+      this.logStream.write(plainMessage + '\n');
+    }
   }
 
   private formatMessage(level: LogLevel, message: string, data?: unknown): string {
@@ -59,27 +96,27 @@ class Logger {
 
   debug(message: string, data?: unknown): void {
     if (this.isDevelopment) {
-      console.log(this.formatMessage(LogLevel.DEBUG, message, data));
+      this.writeToFile(this.formatMessage(LogLevel.DEBUG, message, data));
     }
   }
 
   info(message: string, data?: unknown): void {
-    console.log(this.formatMessage(LogLevel.INFO, message, data));
+    this.writeToFile(this.formatMessage(LogLevel.INFO, message, data));
   }
 
   success(message: string, data?: unknown): void {
-    console.log(this.formatMessage(LogLevel.SUCCESS, message, data));
+    this.writeToFile(this.formatMessage(LogLevel.SUCCESS, message, data));
   }
 
   warning(message: string, data?: unknown): void {
-    console.warn(this.formatMessage(LogLevel.WARNING, message, data));
+    this.writeToFile(this.formatMessage(LogLevel.WARNING, message, data));
   }
 
   error(message: string, error?: unknown): void {
     const errorData = error instanceof Error
       ? { message: error.message, stack: error.stack }
       : error;
-    console.error(this.formatMessage(LogLevel.ERROR, message, errorData));
+    this.writeToFile(this.formatMessage(LogLevel.ERROR, message, errorData));
   }
 
   // Specialized logging for API calls
@@ -88,7 +125,7 @@ class Logger {
     const message = `${emoji} API ${method.toUpperCase()} ${endpoint}`;
     const statusColor = status && status >= 200 && status < 300 ? chalk.green : chalk.red;
 
-    console.log(
+    this.writeToFile(
       chalk.dim(`[${new Date().toISOString()}] `) +
       message +
       (status ? ` ${statusColor(`[${status}]`)}` : '')
@@ -97,11 +134,28 @@ class Logger {
 
   // Specialized logging for data operations
   data(operation: string, details?: string): void {
-    console.log(
+    this.writeToFile(
       chalk.dim(`[${new Date().toISOString()}] `) +
       `💾 ${chalk.cyan(`[DATA]`)} ${operation}` +
       (details ? chalk.gray(` - ${details}`) : '')
     );
+  }
+
+  /**
+   * Get log file path for debugging
+   */
+  getLogFilePath(): string {
+    return this.logFilePath;
+  }
+
+  /**
+   * Close log stream (call on app exit)
+   */
+  close(): void {
+    if (this.logStream) {
+      this.logStream.end();
+      this.logStream = null;
+    }
   }
 }
 
