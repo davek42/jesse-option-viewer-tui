@@ -3,6 +3,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { useAppContext } from '../context/AppContext.js';
+import { safeToFixed } from '../utils/formatters.js';
 
 /**
  * HomeScreen component
@@ -33,14 +34,14 @@ export function HomeScreen() {
           {state.stockQuote && (
             <Box marginTop={1}>
               <Text>
-                Price: <Text bold color="cyan">${state.stockQuote.price.toFixed(2)}</Text>
+                Price: <Text bold color="cyan">${safeToFixed(state.stockQuote.price, 2)}</Text>
                 {' '}
                 <Text color={state.stockQuote.change >= 0 ? 'green' : 'red'}>
                   {state.stockQuote.change >= 0 ? '▲' : '▼'}
                   {' '}
-                  {state.stockQuote.change.toFixed(2)}
+                  {safeToFixed(state.stockQuote.change, 2)}
                   {' '}
-                  ({state.stockQuote.changePercent.toFixed(2)}%)
+                  ({safeToFixed(state.stockQuote.changePercent, 2)}%)
                 </Text>
               </Text>
             </Box>

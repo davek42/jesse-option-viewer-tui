@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { OptionStrategy } from '../types/index.js';
 import { getStrategyDisplayName, formatCurrency } from '../utils/strategies.js';
+import { safeToFixed } from '../utils/formatters.js';
 
 interface SavedStrategiesProps {
   /** List of saved strategies */
@@ -97,17 +98,17 @@ export function SavedStrategies({
 
           // Extract strike prices from legs
           const strikes = strategy.legs
-            .map(leg => `$${leg.strikePrice.toFixed(2)}`)
+            .map(leg => `$${safeToFixed(leg.strikePrice, 2)}`)
             .join(' / ');
 
           // Calculate risk/reward ratio
           const riskRewardRatio = strategy.maxLoss > 0
-            ? (strategy.maxGain / strategy.maxLoss).toFixed(2)
+            ? safeToFixed(strategy.maxGain / strategy.maxLoss, 2)
             : '-';
 
           // Format break even prices
           const breakEvens = strategy.breakEvenPrices
-            .map(be => `$${be.toFixed(2)}`)
+            .map(be => `$${safeToFixed(be, 2)}`)
             .join(', ');
 
           return (

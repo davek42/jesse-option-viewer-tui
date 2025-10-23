@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { useAppContext } from '../context/AppContext.js';
 import { SavedStrategies } from '../components/SavedStrategies.js';
+import { safeToFixed } from '../utils/formatters.js';
 
 interface SavedStrategiesScreenProps {
   /** Currently highlighted strategy index */
@@ -119,10 +120,11 @@ export function SavedStrategiesScreen({
               <Text bold color="cyan">
                 1:
                 {savedStrategies.reduce((sum, s) => sum + Math.abs(s.maxLoss), 0) > 0
-                  ? (
+                  ? safeToFixed(
                       savedStrategies.reduce((sum, s) => sum + s.maxGain, 0) /
-                      savedStrategies.reduce((sum, s) => sum + Math.abs(s.maxLoss), 0)
-                    ).toFixed(2)
+                      savedStrategies.reduce((sum, s) => sum + Math.abs(s.maxLoss), 0),
+                      2
+                    )
                   : '0.00'}
               </Text>
             </Box>

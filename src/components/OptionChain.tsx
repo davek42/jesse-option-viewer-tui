@@ -101,7 +101,7 @@ export function OptionChain({
       {/* Header */}
       <Box marginBottom={1}>
         <Text bold color="cyan">
-          📊 Option Chain: {symbol} @ ${underlyingPrice.toFixed(2)}
+          📊 Option Chain: {symbol} @ ${safeToFixed(underlyingPrice, 2)}
         </Text>
         <Text dimColor> | Exp: {expirationDate}</Text>
         {isLimited && (
@@ -247,7 +247,7 @@ export function OptionChain({
                         <Box width={8}>
                           <Text color={textColor} backgroundColor={bgColor}>
                             {call.impliedVolatility !== undefined
-                              ? (call.impliedVolatility * 100).toFixed(1) + '%'
+                              ? safeToFixed(call.impliedVolatility * 100, 1) + '%'
                               : '-'}
                           </Text>
                         </Box>
@@ -266,7 +266,7 @@ export function OptionChain({
               {/* Strike price (center) */}
               <Box width={10} justifyContent="center">
                 <Text color={textColor} backgroundColor={bgColor} bold>
-                  ${strike.toFixed(2)}
+                  ${safeToFixed(strike, 2)}
                   {isATM && '●'}
                 </Text>
               </Box>
@@ -280,7 +280,7 @@ export function OptionChain({
                         <Box width={8}>
                           <Text color={textColor} backgroundColor={bgColor}>
                             {put.impliedVolatility !== undefined
-                              ? (put.impliedVolatility * 100).toFixed(1) + '%'
+                              ? safeToFixed(put.impliedVolatility * 100, 1) + '%'
                               : '-'}
                           </Text>
                         </Box>
@@ -328,7 +328,7 @@ export function OptionChain({
       {/* Footer info */}
       <Box marginTop={1} flexDirection="column">
         <Text dimColor>
-          ATM Strike: ${atmStrike.toFixed(2)} ● | Total Calls: {calls.length} | Total Puts: {puts.length}
+          ATM Strike: ${safeToFixed(atmStrike, 2)} ● | Total Calls: {calls.length} | Total Puts: {puts.length}
         </Text>
         {!showGreeks && (
           <Text dimColor>
