@@ -69,6 +69,7 @@ function GlobalInputHandler() {
     currentScreen,
     mode,
     inputBuffer,
+    currentSymbol,
     availableExpirations,
     displayLimit,
     optionChain,
@@ -176,6 +177,68 @@ function GlobalInputHandler() {
       } else if (key.downArrow || input === 'j') {
         const maxIndex = availableExpirations.length - 1;
         setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
+      }
+
+      // Select expiration and load option chain
+      else if (key.return) {
+        if (availableExpirations.length === 0) {
+          dispatch({ type: 'SET_STATUS', payload: { message: 'No expirations available', type: 'warning' } });
+          return;
+        }
+
+        const selectedExp = availableExpirations[highlightedIndex];
+        if (!selectedExp) {
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Invalid expiration selection', type: 'error' } });
+          return;
+        }
+
+        if (!currentSymbol) {
+          dispatch({ type: 'SET_STATUS', payload: { message: 'No symbol selected', type: 'error' } });
+          return;
+        }
+
+        // Set selected expiration
+        dispatch({ type: 'SET_EXPIRATION', payload: selectedExp });
+        dispatch({ type: 'SET_LOADING', payload: true });
+        dispatch({
+          type: 'SET_STATUS',
+          payload: { message: `Loading option chain for ${selectedExp}...`, type: 'info' },
+        });
+
+        // Load option chain asynchronously
+        (async () => {
+          try {
+            logger.info(`📊 Loading option chain for ${currentSymbol} - ${selectedExp}`);
+            const client = getAlpacaClient();
+            const chain = await client.getOptionChain(currentSymbol, selectedExp);
+
+            if (chain) {
+              dispatch({ type: 'SET_OPTION_CHAIN', payload: chain });
+              dispatch({
+                type: 'SET_STATUS',
+                payload: {
+                  message: `✓ Loaded ${chain.calls.length} calls, ${chain.puts.length} puts`,
+                  type: 'success',
+                },
+              });
+              logger.info(`✅ Option chain loaded: ${chain.calls.length} calls, ${chain.puts.length} puts`);
+            } else {
+              dispatch({
+                type: 'SET_STATUS',
+                payload: { message: 'Failed to load option chain', type: 'error' },
+              });
+              logger.error('❌ Failed to load option chain: No data returned');
+            }
+          } catch (error) {
+            logger.error('❌ Error loading option chain:', error);
+            dispatch({
+              type: 'SET_STATUS',
+              payload: { message: 'Error loading option chain', type: 'error' },
+            });
+          } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+        })();
       }
 
       // View full option chain
