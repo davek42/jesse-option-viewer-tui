@@ -116,12 +116,35 @@ export function OptionChain({
   const callsMap = new Map(calls.map(c => [c.strikePrice, c]));
   const putsMap = new Map(puts.map(p => [p.strikePrice, p]));
 
-  // Calculate total shown
-  const totalStrikes = [...new Set([...calls.map(c => c.strikePrice), ...puts.map(p => p.strikePrice)])].length;
+  // Calculate scroll indicators (Phase 3.2)
+  const allStrikes = [...new Set([...calls.map(c => c.strikePrice), ...puts.map(p => p.strikePrice)])].sort((a, b) => a - b);
+  const totalStrikes = allStrikes.length;
   const isLimited = displayLimit !== -1 && displayStrikes.length < totalStrikes;
+
+  // Calculate position in full chain (with guards for empty array)
+  const firstDisplayedStrike = displayStrikes[0] ?? 0;
+  const lastDisplayedStrike = displayStrikes[displayStrikes.length - 1] ?? 0;
+  const firstIndex = displayStrikes.length > 0 ? allStrikes.indexOf(firstDisplayedStrike) + 1 : 0; // 1-based for display
+  const lastIndex = displayStrikes.length > 0 ? allStrikes.indexOf(lastDisplayedStrike) + 1 : 0; // 1-based for display
+
+  // Determine if there are more strikes above/below
+  const hasStrikesAbove = displayStrikes.length > 0 && allStrikes.length > 0 && firstDisplayedStrike > (allStrikes[0] ?? 0);
+  const hasStrikesBelow = displayStrikes.length > 0 && allStrikes.length > 0 && lastDisplayedStrike < (allStrikes[allStrikes.length - 1] ?? Infinity);
+  const strikesAboveCount = hasStrikesAbove ? allStrikes.indexOf(firstDisplayedStrike) : 0;
+  const strikesBelowCount = hasStrikesBelow ? allStrikes.length - allStrikes.indexOf(lastDisplayedStrike) - 1 : 0;
 
   return (
     <Box flexDirection="column" paddingX={1}>
+      {/* Scroll indicator - Strikes above (Phase 3.2) */}
+      {hasStrikesAbove && (
+        <Box marginBottom={1}>
+          <Text color="yellow">
+            ▲ {strikesAboveCount} strike{strikesAboveCount !== 1 ? 's' : ''} above{' '}
+            <Text dimColor>(scroll up to see higher strikes)</Text>
+          </Text>
+        </Box>
+      )}
+
       {/* Header */}
       <Box marginBottom={1}>
         <Text bold color="cyan">
@@ -130,7 +153,7 @@ export function OptionChain({
         <Text dimColor> | Exp: {expirationDate}</Text>
         {isLimited && (
           <Text dimColor>
-            {' '}| Showing {displayStrikes.length} of {totalStrikes} strikes
+            {' '}| Strikes {firstIndex}-{lastIndex} of {totalStrikes}
           </Text>
         )}
       </Box>
@@ -360,6 +383,16 @@ export function OptionChain({
           </Text>
         )}
       </Box>
+
+      {/* Scroll indicator - Strikes below (Phase 3.2) */}
+      {hasStrikesBelow && (
+        <Box marginTop={1}>
+          <Text color="yellow">
+            ▼ {strikesBelowCount} strike{strikesBelowCount !== 1 ? 's' : ''} below{' '}
+            <Text dimColor>(scroll down to see lower strikes)</Text>
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
