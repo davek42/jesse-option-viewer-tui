@@ -204,7 +204,7 @@ export function OptionChainScreen({
 
   return (
     <Box flexDirection="column" paddingY={1}>
-      {/* Stock quote banner */}
+      {/* Stock quote banner - Always visible */}
       {stockQuote && (
         <Box paddingX={1} marginBottom={1} borderStyle="round" borderColor="cyan">
           <Box>
@@ -228,18 +228,8 @@ export function OptionChainScreen({
         </Box>
       )}
 
-      {/* Saved Strategies (Task #8) - Display below stock quote */}
-      <Box marginBottom={2}>
-        <SavedStrategies
-          strategies={savedStrategies}
-          onRemove={handleStrategyRemove}
-          highlightedIndex={currentFocus === 'strategies' ? highlightedIndex : 0}
-          isFocused={currentFocus === 'strategies'}
-        />
-      </Box>
-
-      {/* Strategy Builder (Task #7) - Bull Call Spread */}
-      {strategyBuilderActive && optionChain && (
+      {/* FULL-SCREEN MODAL MODE: Strategy Builder */}
+      {strategyBuilderActive && optionChain ? (
         <Box marginBottom={2}>
           <StrategyBuilder
             calls={optionChain.calls}
@@ -253,69 +243,83 @@ export function OptionChainScreen({
             onCancel={() => {}} // Handled by global input handler
           />
         </Box>
+      ) : (
+        <>
+          {/* NORMAL MODE: Show all other components */}
+
+          {/* Saved Strategies (Task #8) - Display below stock quote */}
+          <Box marginBottom={2}>
+            <SavedStrategies
+              strategies={savedStrategies}
+              onRemove={handleStrategyRemove}
+              highlightedIndex={currentFocus === 'strategies' ? highlightedIndex : 0}
+              isFocused={currentFocus === 'strategies'}
+            />
+          </Box>
+
+          {/* Expiration selector */}
+          <Box marginBottom={2}>
+            <ExpirationSelect
+              expirations={availableExpirations}
+              selectedExpiration={selectedExpiration}
+              onSelect={handleExpirationSelect}
+              highlightedIndex={currentFocus === 'expiration' ? highlightedIndex : 0}
+              isFocused={currentFocus === 'expiration'}
+            />
+          </Box>
+
+          {/* Option chain display */}
+          {optionChain && (
+            <Box>
+              <OptionChain
+                optionChain={optionChain}
+                displayLimit={displayLimit}
+                showGreeks={showGreeks}
+                highlightedRow={currentFocus === 'optionChain' ? highlightedIndex : 0}
+                isFocused={currentFocus === 'optionChain'}
+              />
+            </Box>
+          )}
+
+          {/* Loading indicator for background operations */}
+          {loading && optionChain && (
+            <Box paddingX={1} marginTop={1}>
+              <Text color="cyan">🔄 Loading...</Text>
+            </Box>
+          )}
+
+          {/* Keyboard shortcuts help */}
+          <Box paddingX={1} marginTop={1}>
+            <Text dimColor>
+              <Text bold color="cyan">
+                e
+              </Text>{' '}
+              Expiration{' '}
+              <Text bold color="cyan">
+                o
+              </Text>{' '}
+              Options{' '}
+              <Text bold color="cyan">
+                l
+              </Text>{' '}
+              Limit (
+              {displayLimit === -1 ? 'ALL' : displayLimit}){' '}
+              <Text bold color="cyan">
+                g
+              </Text>{' '}
+              Greeks{' '}
+              <Text bold color="cyan">
+                s
+              </Text>{' '}
+              Symbol{' '}
+              <Text bold color="cyan">
+                q
+              </Text>{' '}
+              Back
+            </Text>
+          </Box>
+        </>
       )}
-
-      {/* Expiration selector */}
-      <Box marginBottom={2}>
-        <ExpirationSelect
-          expirations={availableExpirations}
-          selectedExpiration={selectedExpiration}
-          onSelect={handleExpirationSelect}
-          highlightedIndex={currentFocus === 'expiration' ? highlightedIndex : 0}
-          isFocused={currentFocus === 'expiration'}
-        />
-      </Box>
-
-      {/* Option chain display */}
-      {optionChain && (
-        <Box>
-          <OptionChain
-            optionChain={optionChain}
-            displayLimit={displayLimit}
-            showGreeks={showGreeks}
-            highlightedRow={currentFocus === 'optionChain' ? highlightedIndex : 0}
-            isFocused={currentFocus === 'optionChain'}
-          />
-        </Box>
-      )}
-
-      {/* Loading indicator for background operations */}
-      {loading && optionChain && (
-        <Box paddingX={1} marginTop={1}>
-          <Text color="cyan">🔄 Loading...</Text>
-        </Box>
-      )}
-
-      {/* Keyboard shortcuts help */}
-      <Box paddingX={1} marginTop={1}>
-        <Text dimColor>
-          <Text bold color="cyan">
-            e
-          </Text>{' '}
-          Expiration{' '}
-          <Text bold color="cyan">
-            o
-          </Text>{' '}
-          Options{' '}
-          <Text bold color="cyan">
-            l
-          </Text>{' '}
-          Limit (
-          {displayLimit === -1 ? 'ALL' : displayLimit}){' '}
-          <Text bold color="cyan">
-            g
-          </Text>{' '}
-          Greeks{' '}
-          <Text bold color="cyan">
-            s
-          </Text>{' '}
-          Symbol{' '}
-          <Text bold color="cyan">
-            q
-          </Text>{' '}
-          Back
-        </Text>
-      </Box>
     </Box>
   );
 }

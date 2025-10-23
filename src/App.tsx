@@ -251,6 +251,7 @@ function GlobalInputHandler() {
         // Activate strategy builder
         else if (input === 'b') {
           if (optionChain && optionChain.calls.length > 0) {
+            logger.info('🏗️ Activating Bull Call Spread Builder');
             dispatch({ type: 'ACTIVATE_STRATEGY_BUILDER' });
             setHighlightedIndex(0);
             dispatch({ type: 'SET_STATUS', payload: { message: 'Bull Call Spread Builder: Select LONG call (buy)', type: 'info' } });
