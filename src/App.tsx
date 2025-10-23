@@ -7,9 +7,11 @@ import { Header } from './components/Header.js';
 import { StatusBar } from './components/StatusBar.js';
 import { HomeScreen } from './screens/HomeScreen.js';
 import { OptionChainScreen } from './screens/OptionChainScreen.js';
+import { TerminalSizeWarning } from './components/TerminalSizeWarning.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
 import { createBullCallSpread } from './utils/strategies.js';
+import { useTerminalSize, calculateSafeDisplayLimit } from './hooks/useTerminalSize.js';
 
 // Navigation state context for option chain screen
 interface NavigationState {
@@ -354,8 +356,21 @@ function GlobalInputHandler() {
  * App content component (must be inside AppProvider)
  */
 function AppContent() {
-  const { state } = useAppContext();
+  const { state, dispatch } = useAppContext();
   const { optionChainFocus, highlightedIndex, showGreeks, setHighlightedIndex } = useNavigation();
+  const terminalSize = useTerminalSize();
+
+  // Auto-adjust display limit based on terminal size
+  useEffect(() => {
+    const safeLimit = calculateSafeDisplayLimit(terminalSize.rows);
+
+    // Only update if different from current limit
+    if (state.displayLimit !== safeLimit && state.displayLimit !== -1) {
+      // Don't override if user explicitly set to ALL (-1)
+      dispatch({ type: 'SET_DISPLAY_LIMIT', payload: safeLimit });
+      logger.debug(`Auto-adjusted display limit to ${safeLimit} based on terminal size ${terminalSize.columns}x${terminalSize.rows}`);
+    }
+  }, [terminalSize.rows, terminalSize.columns, state.displayLimit, dispatch]);
 
   // Test Alpaca connection on mount
   useEffect(() => {
@@ -377,6 +392,9 @@ function AppContent() {
 
       {/* Header */}
       <Header compact />
+
+      {/* Terminal size warning */}
+      <TerminalSizeWarning terminalSize={terminalSize} />
 
       {/* Main content area */}
       <Box flexGrow={1} flexDirection="column">
