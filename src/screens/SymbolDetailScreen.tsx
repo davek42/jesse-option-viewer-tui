@@ -6,6 +6,7 @@ import { useAppContext } from '../context/AppContext.js';
 import { ExpirationSelect } from '../components/ExpirationSelect.js';
 import { getAlpacaClient } from '../lib/alpaca.js';
 import { logger } from '../utils/logger.js';
+import { safeToFixed } from '../utils/formatters.js';
 
 interface SymbolDetailScreenProps {
   /** Highlighted index for expiration selector */
@@ -127,13 +128,13 @@ export function SymbolDetailScreen({
             </Text>
             <Text> @ </Text>
             <Text bold color="white">
-              ${stockQuote.price.toFixed(2)}
+              ${safeToFixed(stockQuote.price, 2)}
             </Text>
           </Box>
           <Box marginLeft={2}>
             <Text color={stockQuote.change >= 0 ? 'green' : 'red'}>
-              {stockQuote.change >= 0 ? '▲' : '▼'} {stockQuote.change.toFixed(2)} (
-              {stockQuote.changePercent.toFixed(2)}%)
+              {stockQuote.change >= 0 ? '▲' : '▼'} {safeToFixed(stockQuote.change, 2)} (
+              {safeToFixed(stockQuote.changePercent, 2)}%)
             </Text>
           </Box>
           <Box marginLeft={2}>

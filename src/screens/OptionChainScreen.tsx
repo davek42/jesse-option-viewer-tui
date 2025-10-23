@@ -11,6 +11,7 @@ import { getAlpacaClient } from '../lib/alpaca.js';
 import { logger } from '../utils/logger.js';
 import { createBullCallSpread } from '../utils/strategies.js';
 import type { OptionContract } from '../types/index.js';
+import { safeToFixed } from '../utils/formatters.js';
 
 type FocusArea = 'expiration' | 'optionChain' | 'strategies' | 'builder';
 
@@ -213,13 +214,13 @@ export function OptionChainScreen({
             </Text>
             <Text> @ </Text>
             <Text bold color="white">
-              ${stockQuote.price.toFixed(2)}
+              ${safeToFixed(stockQuote.price, 2)}
             </Text>
           </Box>
           <Box marginLeft={2}>
             <Text color={stockQuote.change >= 0 ? 'green' : 'red'}>
-              {stockQuote.change >= 0 ? '▲' : '▼'} {stockQuote.change.toFixed(2)} (
-              {stockQuote.changePercent.toFixed(2)}%)
+              {stockQuote.change >= 0 ? '▲' : '▼'} {safeToFixed(stockQuote.change, 2)} (
+              {safeToFixed(stockQuote.changePercent, 2)}%)
             </Text>
           </Box>
           <Box marginLeft={2}>

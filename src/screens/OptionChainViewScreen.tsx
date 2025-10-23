@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { useAppContext } from '../context/AppContext.js';
 import { OptionChain } from '../components/OptionChain.js';
+import { safeToFixed } from '../utils/formatters.js';
 
 interface OptionChainViewScreenProps {
   /** Highlighted row index */
@@ -74,12 +75,12 @@ export function OptionChainViewScreen({
               </Text>
               <Text> @ </Text>
               <Text bold color="white">
-                ${stockQuote.price.toFixed(2)}
+                ${safeToFixed(stockQuote.price, 2)}
               </Text>
               <Box marginLeft={2}>
                 <Text color={stockQuote.change >= 0 ? 'green' : 'red'}>
-                  {stockQuote.change >= 0 ? '▲' : '▼'} {stockQuote.change.toFixed(2)} (
-                  {stockQuote.changePercent.toFixed(2)}%)
+                  {stockQuote.change >= 0 ? '▲' : '▼'} {safeToFixed(stockQuote.change, 2)} (
+                  {safeToFixed(stockQuote.changePercent, 2)}%)
                 </Text>
               </Box>
             </>
