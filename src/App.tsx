@@ -109,10 +109,22 @@ function getAvailableOptionsForStep(
 
     case 'iron_condor':
       // 4 legs: Buy low put, Sell higher put, Sell lower call, Buy high call
+      // Note: Puts and calls are on opposite sides of stock price, so we can't compare put strikes to call strikes
       if (step === 'leg1') return puts; // Buy OTM put (lowest)
-      if (step === 'leg2') return puts.filter(p => selectedLegs[0] ? p.strikePrice > selectedLegs[0].strikePrice : true); // Sell put
-      if (step === 'leg3') return calls.filter(c => selectedLegs[1] ? c.strikePrice > selectedLegs[1].strikePrice : true); // Sell call
-      if (step === 'leg4') return calls.filter(c => selectedLegs[2] ? c.strikePrice > selectedLegs[2].strikePrice : true); // Buy call
+      if (step === 'leg2') {
+        // Sell put: must be higher strike than leg 1 (the long put)
+        return puts.filter(p => selectedLegs[0] ? p.strikePrice > selectedLegs[0].strikePrice : true);
+      }
+      if (step === 'leg3') {
+        // Sell call: just show all calls (user will choose OTM call above stock price)
+        // Can't compare to put strikes from legs 1-2
+        return calls;
+      }
+      if (step === 'leg4') {
+        // Buy call: must be higher strike than leg 3 (the short call)
+        const shortCall = selectedLegs[2];
+        return shortCall ? calls.filter(c => c.strikePrice > shortCall.strikePrice) : calls;
+      }
       return [];
 
     case 'covered_call':
@@ -260,11 +272,11 @@ function getSelectionStatusMessage(
 
     case 'iron_condor':
       if (legNumber === 1) {
-        return `✓ BUY OTM PUT (lowest) at ${strike}. Select leg 2: SELL PUT (higher strike)`;
+        return `✓ BUY OTM PUT (lowest) at ${strike}. Select leg 2: SELL PUT (higher strike than ${strike})`;
       } else if (legNumber === 2) {
-        return `✓ SELL PUT at ${strike}. Select leg 3: SELL CALL (even higher strike)`;
+        return `✓ SELL PUT at ${strike}. Select leg 3: SELL CALL (choose OTM call above stock price)`;
       } else if (legNumber === 3) {
-        return `✓ SELL CALL at ${strike}. Select leg 4: BUY OTM CALL (highest strike)`;
+        return `✓ SELL CALL at ${strike}. Select leg 4: BUY OTM CALL (higher strike than ${strike})`;
       }
       return `✓ BUY OTM CALL at ${strike} selected. Press Enter to SAVE strategy`;
 
