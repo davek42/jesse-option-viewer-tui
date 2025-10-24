@@ -206,6 +206,31 @@ function createStrategyByType(
 }
 
 /**
+ * Get initial instruction message when strategy builder opens
+ */
+function getInitialStrategyMessage(strategyType: StrategyType): string {
+  switch (strategyType) {
+    case 'bull_call_spread':
+      return 'Select LONG CALL (Buy) - Choose ATM or slightly OTM strike';
+
+    case 'bear_put_spread':
+      return 'Select LONG PUT (Buy) - Choose higher strike put';
+
+    case 'long_straddle':
+      return 'Select ATM CALL (Buy) - Choose at-the-money strike';
+
+    case 'iron_condor':
+      return 'Select leg 1: BUY OTM PUT (lowest strike) - Start with furthest OTM put';
+
+    case 'covered_call':
+      return 'Select OTM CALL (Sell) - Assumes you own 100 shares. Choose higher strike to cap gains';
+
+    default:
+      return 'Select first option for this strategy';
+  }
+}
+
+/**
  * Get strategy-specific status message for leg selection
  */
 function getSelectionStatusMessage(
@@ -493,7 +518,9 @@ function GlobalInputHandler() {
               dispatch({ type: 'SET_STRATEGY_TYPE', payload: selectedType });
               setHighlightedIndex(0);
               logger.info(`📋 Selected strategy type: ${selectedType}`);
-              dispatch({ type: 'SET_STATUS', payload: { message: `Building ${selectedType.replace('_', ' ')}`, type: 'success' } });
+              // Show initial instruction message
+              const initialMessage = getInitialStrategyMessage(selectedType);
+              dispatch({ type: 'SET_STATUS', payload: { message: initialMessage, type: 'info' } });
             }
           }
           // Cancel strategy selection
