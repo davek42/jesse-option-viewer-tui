@@ -460,7 +460,7 @@ function GlobalInputHandler() {
         }
 
         // Task #9: Strategy Building Mode (strategy type is selected)
-        // Navigation keys
+        // Navigation keys - allow scrolling through all available options
         if (key.upArrow || input === 'k') {
           setHighlightedIndex((prev) => Math.max(0, prev - 1));
         } else if (key.downArrow || input === 'j') {
@@ -473,7 +473,7 @@ function GlobalInputHandler() {
             state.selectedLongCall,
             state.selectedLegs
           );
-          const maxIndex = Math.min(availableOptions.length - 1, 9); // Limit to first 10
+          const maxIndex = availableOptions.length - 1; // Allow scrolling through all options
           setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
         }
 

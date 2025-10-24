@@ -314,45 +314,85 @@ export function StrategyBuilder({
           </Box>
         </Box>
 
-        {/* Options list */}
+        {/* Options list with scrolling window */}
         <Box flexDirection="column">
-          {availableOptions.slice(0, 10).map((option, index) => {
-            const isHighlighted = index === highlightedIndex;
-            const bgColor = isHighlighted ? 'cyan' : undefined;
-            const textColor = isHighlighted ? 'black' : 'white';
+          {(() => {
+            const DISPLAY_LIMIT = 10;
+            const totalOptions = availableOptions.length;
+
+            // Calculate scroll window
+            let startIndex = Math.max(0, highlightedIndex - Math.floor(DISPLAY_LIMIT / 2));
+            const endIndex = Math.min(totalOptions, startIndex + DISPLAY_LIMIT);
+
+            // Adjust start if we're near the end
+            if (endIndex - startIndex < DISPLAY_LIMIT) {
+              startIndex = Math.max(0, endIndex - DISPLAY_LIMIT);
+            }
+
+            const visibleOptions = availableOptions.slice(startIndex, endIndex);
+            const hasMore = {
+              above: startIndex > 0,
+              below: endIndex < totalOptions,
+            };
 
             return (
-              <Box key={option.symbol}>
-                <Box width={12}>
-                  <Text color={textColor} backgroundColor={bgColor} bold={isHighlighted}>
-                    {isHighlighted ? '▶ ' : '  '}${safeToFixed(option.strikePrice, 2)}
-                  </Text>
-                </Box>
-                <Box width={10}>
-                  <Text color={textColor} backgroundColor={bgColor}>
-                    ${safeToFixed(option.bid, 2)}/${safeToFixed(option.ask, 2)}
-                  </Text>
-                </Box>
-                <Box width={10}>
-                  <Text color={textColor} backgroundColor={bgColor}>
-                    ${safeToFixed(option.lastPrice, 2)}
-                  </Text>
-                </Box>
-                <Box width={10}>
-                  <Text color={textColor} backgroundColor={bgColor}>
-                    {safeToFixed(option.delta, 3)}
-                  </Text>
-                </Box>
-                <Box width={10}>
-                  <Text color={textColor} backgroundColor={bgColor}>
-                    {option.impliedVolatility !== undefined
-                      ? formatPercentage(option.impliedVolatility * 100)
-                      : '-'}
-                  </Text>
-                </Box>
-              </Box>
+              <>
+                {/* Scroll indicator - more above */}
+                {hasMore.above && (
+                  <Box marginBottom={1}>
+                    <Text dimColor>▲ {startIndex} more above</Text>
+                  </Box>
+                )}
+
+                {/* Visible options */}
+                {visibleOptions.map((option, displayIndex) => {
+                  const actualIndex = startIndex + displayIndex;
+                  const isHighlighted = actualIndex === highlightedIndex;
+                  const bgColor = isHighlighted ? 'cyan' : undefined;
+                  const textColor = isHighlighted ? 'black' : 'white';
+
+                  return (
+                    <Box key={option.symbol}>
+                      <Box width={12}>
+                        <Text color={textColor} backgroundColor={bgColor} bold={isHighlighted}>
+                          {isHighlighted ? '▶ ' : '  '}${safeToFixed(option.strikePrice, 2)}
+                        </Text>
+                      </Box>
+                      <Box width={10}>
+                        <Text color={textColor} backgroundColor={bgColor}>
+                          ${safeToFixed(option.bid, 2)}/${safeToFixed(option.ask, 2)}
+                        </Text>
+                      </Box>
+                      <Box width={10}>
+                        <Text color={textColor} backgroundColor={bgColor}>
+                          ${safeToFixed(option.lastPrice, 2)}
+                        </Text>
+                      </Box>
+                      <Box width={10}>
+                        <Text color={textColor} backgroundColor={bgColor}>
+                          {safeToFixed(option.delta, 3)}
+                        </Text>
+                      </Box>
+                      <Box width={10}>
+                        <Text color={textColor} backgroundColor={bgColor}>
+                          {option.impliedVolatility !== undefined
+                            ? formatPercentage(option.impliedVolatility * 100)
+                            : '-'}
+                        </Text>
+                      </Box>
+                    </Box>
+                  );
+                })}
+
+                {/* Scroll indicator - more below */}
+                {hasMore.below && (
+                  <Box marginTop={1}>
+                    <Text dimColor>▼ {totalOptions - endIndex} more below</Text>
+                  </Box>
+                )}
+              </>
             );
-          })}
+          })()}
         </Box>
       </Box>
 
