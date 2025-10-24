@@ -165,6 +165,7 @@ export type AppAction =
   | { type: 'SET_AVAILABLE_EXPIRATIONS'; payload: string[] }
   | { type: 'ADD_STRATEGY'; payload: OptionStrategy }
   | { type: 'REMOVE_STRATEGY'; payload: string }
+  | { type: 'LOAD_STRATEGIES'; payload: OptionStrategy[] }
   | { type: 'SET_DISPLAY_LIMIT'; payload: number }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }

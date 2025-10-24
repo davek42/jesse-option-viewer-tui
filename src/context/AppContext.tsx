@@ -1,7 +1,9 @@
 // AIDEV-NOTE: Global application state management using React Context + useReducer
 
-import React, { createContext, useContext, useReducer, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import type { AppState, AppAction } from '../types/index.js';
+import { loadStrategies, saveStrategies } from '../utils/storage.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Initial application state
@@ -196,6 +198,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         savedStrategies: state.savedStrategies.filter(s => s.id !== action.payload),
       };
 
+    case 'LOAD_STRATEGIES':
+      return {
+        ...state,
+        savedStrategies: action.payload,
+      };
+
     case 'SET_DISPLAY_LIMIT':
       return {
         ...state,
@@ -274,6 +282,30 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
  */
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Load strategies from disk on mount (Task #8 Enhancement - Persistence)
+  useEffect(() => {
+    (async () => {
+      const strategies = await loadStrategies();
+      if (strategies.length > 0) {
+        dispatch({ type: 'LOAD_STRATEGIES', payload: strategies });
+        logger.success(`📂 Loaded ${strategies.length} saved strateg${strategies.length === 1 ? 'y' : 'ies'} from disk`);
+      }
+    })();
+  }, []);
+
+  // Auto-save strategies to disk whenever they change (Task #8 Enhancement - Persistence)
+  useEffect(() => {
+    // Skip save on initial mount (strategies are empty initially)
+    if (state.savedStrategies.length === 0 && !initialState.savedStrategies.length) {
+      return;
+    }
+
+    // Save strategies asynchronously
+    (async () => {
+      await saveStrategies(state.savedStrategies);
+    })();
+  }, [state.savedStrategies]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
