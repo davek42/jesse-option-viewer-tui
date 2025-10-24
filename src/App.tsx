@@ -561,6 +561,15 @@ function GlobalInputHandler() {
             state.selectedLegs
           );
           const maxIndex = availableOptions.length - 1; // Allow scrolling through all options
+
+          // Debug logging for Iron Condor filtering issues
+          if (state.selectedStrategyType === 'iron_condor' && (state.builderStep === 'leg2' || state.builderStep === 'leg4')) {
+            logger.debug(`Iron Condor ${state.builderStep}: ${availableOptions.length} options available, maxIndex=${maxIndex}, currentIndex=${highlightedIndex}`);
+            if (availableOptions.length > 0) {
+              logger.debug(`First strike: ${availableOptions[0]?.strikePrice}, Last strike: ${availableOptions[availableOptions.length - 1]?.strikePrice}`);
+            }
+          }
+
           setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
         }
 
