@@ -77,6 +77,8 @@ export function OptionChainScreen({
     loading,
     error,
     displayLimit,
+    selectedStrategyType,
+    selectedLegs,
   } = state;
 
   // Auto-select first expiration if none selected
@@ -233,13 +235,13 @@ export function OptionChainScreen({
       {strategyBuilderActive && optionChain ? (
         <Box marginBottom={2}>
           <StrategyBuilder
-            strategyType={'bull_call_spread'} // TODO: Get from state when multi-strategy is fully implemented
+            strategyType={selectedStrategyType || 'bull_call_spread'}
             calls={optionChain.calls}
             puts={optionChain.puts}
             stockPrice={stockQuote?.price || 0}
             longCall={selectedLongCall}
             shortCall={selectedShortCall}
-            selectedLegs={[]}
+            selectedLegs={selectedLegs}
             selectionStep={builderStep}
             highlightedIndex={highlightedIndex}
             quantity={1}

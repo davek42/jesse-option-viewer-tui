@@ -200,8 +200,10 @@ function createStrategyByType(
 
     case 'iron_condor': {
       const [leg1, leg2, leg3, leg4] = selectedLegs;
+      // AIDEV-NOTE: selectedLegs order: [longPut, shortPut, shortCall, longCall]
+      // createIronCondor expects: (symbol, longCall, shortCall, shortPut, longPut, quantity)
       return leg1 && leg2 && leg3 && leg4
-        ? createIronCondor(symbol, leg1, leg2, leg3, leg4, 1)
+        ? createIronCondor(symbol, leg4, leg3, leg2, leg1, 1)  // Reorder parameters
         : null;
     }
 

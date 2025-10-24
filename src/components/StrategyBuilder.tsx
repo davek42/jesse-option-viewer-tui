@@ -15,6 +15,7 @@ import {
   getStrategyDescription
 } from '../utils/strategies.js';
 import { safeToFixed } from '../utils/formatters.js';
+import { logger } from '../utils/logger.js';
 
 interface StrategyBuilderProps {
   /** Strategy type being built (Task #9) */
@@ -187,8 +188,58 @@ export function StrategyBuilder({
       return { availableOptions: availableCalls, optionType: 'call' as const };
     }
 
-    // For other strategies, use generic leg-based approach
-    // TODO: Implement filtering logic for each strategy type
+    // For bear_put_spread
+    if (strategyType === 'bear_put_spread') {
+      if (selectionStep === 'leg1') {
+        return { availableOptions: puts, optionType: 'put' as const };
+      }
+      // leg2: sell lower strike put (must be lower than leg1)
+      const longPut = selectedLegs[0];
+      const filtered = longPut ? puts.filter(p => p.strikePrice < longPut.strikePrice) : puts;
+      return { availableOptions: filtered, optionType: 'put' as const };
+    }
+
+    // For long_straddle
+    if (strategyType === 'long_straddle') {
+      if (selectionStep === 'leg1') {
+        return { availableOptions: calls, optionType: 'call' as const };
+      }
+      // leg2: buy ATM put (same strike as call)
+      return { availableOptions: puts, optionType: 'put' as const };
+    }
+
+    // For iron_condor
+    if (strategyType === 'iron_condor') {
+      if (selectionStep === 'leg1') {
+        return { availableOptions: puts, optionType: 'put' as const };
+      }
+      if (selectionStep === 'leg2') {
+        // Sell put: must be higher strike than leg 1 (the long put)
+        const longPut = selectedLegs[0];
+        const filtered = longPut ? puts.filter(p => p.strikePrice > longPut.strikePrice) : puts;
+        return { availableOptions: filtered, optionType: 'put' as const };
+      }
+      if (selectionStep === 'leg3') {
+        // Sell call: just show all calls (user will choose OTM call above stock price)
+        return { availableOptions: calls, optionType: 'call' as const };
+      }
+      if (selectionStep === 'leg4') {
+        // Buy call: must be higher strike than leg 3 (the short call)
+        const shortCall = selectedLegs[2];
+        logger.debug(`🔍 BUILDER FILTER: leg4 - selectedLegs.length=${selectedLegs.length}, shortCall=${shortCall ? `strike ${shortCall.strikePrice}` : 'undefined'}`);
+        logger.debug(`🔍 BUILDER FILTER: calls.length=${calls.length}, filtering for strikes > ${shortCall?.strikePrice}`);
+        const filtered = shortCall ? calls.filter(c => c.strikePrice > shortCall.strikePrice) : calls;
+        logger.debug(`🔍 BUILDER FILTER: filtered.length=${filtered.length}, first=${filtered[0]?.strikePrice}, last=${filtered[filtered.length-1]?.strikePrice}`);
+        return { availableOptions: filtered, optionType: 'call' as const };
+      }
+    }
+
+    // For covered_call
+    if (strategyType === 'covered_call') {
+      return { availableOptions: calls, optionType: 'call' as const };
+    }
+
+    // Default fallback
     return { availableOptions: calls, optionType: 'call' as const };
   }, [strategyType, selectionStep, calls, puts, longCall, selectedLegs]);
 
@@ -335,6 +386,14 @@ export function StrategyBuilder({
               below: endIndex < totalOptions,
             };
 
+            // AIDEV-NOTE: Debug logging for display indexing (tracking visual display bug)
+            logger.debug(`🔍 DISPLAY: highlightedIndex=${highlightedIndex}, startIndex=${startIndex}, endIndex=${endIndex}, totalOptions=${totalOptions}`);
+            logger.debug(`🔍 DISPLAY: visibleOptions.length=${visibleOptions.length}, first visible strike=${visibleOptions[0]?.strikePrice || 'none'}, last visible strike=${visibleOptions[visibleOptions.length - 1]?.strikePrice || 'none'}`);
+
+            // Log all visible strikes for full transparency
+            const visibleStrikes = visibleOptions.map(o => o.strikePrice).join(', ');
+            logger.debug(`🔍 DISPLAY: All visible strikes: [${visibleStrikes}]`);
+
             return (
               <>
                 {/* Scroll indicator - more above */}
@@ -350,6 +409,11 @@ export function StrategyBuilder({
                   const isHighlighted = actualIndex === highlightedIndex;
                   const bgColor = isHighlighted ? 'cyan' : undefined;
                   const textColor = isHighlighted ? 'black' : 'white';
+
+                  // AIDEV-NOTE: Log the highlighted option being rendered
+                  if (isHighlighted) {
+                    logger.debug(`🔍 DISPLAY: 🎯 RENDERING HIGHLIGHTED: displayIndex=${displayIndex}, actualIndex=${actualIndex}, strikePrice=${option.strikePrice}`);
+                  }
 
                   return (
                     <Box key={option.symbol}>
