@@ -60,6 +60,32 @@ The application should:
 - Never expose API keys in client-side code
 
 
+## UI/UX Improvements (In Progress)
+
+### Navigation & Consistency
+- Normalize Strategy Builder to use 'q' instead of ESC for going back (consistency with other screens)
+- Add 'j/k' vim-style navigation everywhere (in addition to arrow keys)
+- Allow number keys (1-4) to jump directly to a specific leg in strategy builder
+- Center Strategy Builder on ATM strike for legs showing all strikes
+
+### Visual Enhancements
+- Add color coding to strategy legs in SavedStrategies display (BUY = green, SELL = red)
+- Add visual indicator for current leg being selected (e.g., "Leg 2/4")
+- Highlight wide bid/ask spreads (>5%) in yellow/red to identify liquidity issues
+- Show volume for each option contract
+
+### User Experience
+- Create general help screen with app instructions and keyboard shortcuts
+- Add keyboard shortcut reminder at bottom of Strategy Builder
+- Allow 'x' or 'd' to delete/cancel current leg selection and go back one step
+- Add confirmation prompt before saving strategy (show full summary first)
+
+### Strategy Management
+- In SavedStrategies, show days until expiration
+- Add quick strategy duplication feature (copy existing strategy to build similar one)
+- Sort saved strategies by symbol or date
+
+
 ## Further Enhancements
 
 Potential extensions to consider:
