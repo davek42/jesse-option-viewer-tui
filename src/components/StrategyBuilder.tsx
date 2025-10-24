@@ -201,11 +201,18 @@ export function StrategyBuilder({
 
     // For long_straddle
     if (strategyType === 'long_straddle') {
+      logger.debug(`🔍 BUILDER FILTER: long_straddle - selectionStep=${selectionStep}, selectedLegs.length=${selectedLegs.length}`);
       if (selectionStep === 'leg1') {
+        logger.debug(`🔍 BUILDER FILTER: long_straddle leg1 - returning ${calls.length} calls`);
         return { availableOptions: calls, optionType: 'call' as const };
       }
       // leg2: buy ATM put (same strike as call)
-      return { availableOptions: puts, optionType: 'put' as const };
+      const selectedCall = selectedLegs.find(leg => leg.optionType === 'call');
+      const filtered = selectedCall
+        ? puts.filter(p => p.strikePrice === selectedCall.strikePrice)
+        : puts;
+      logger.debug(`🔍 BUILDER FILTER: long_straddle leg2 - selectedCall strike=${selectedCall?.strikePrice}, filtered=${filtered.length} puts (from ${puts.length} total)`);
+      return { availableOptions: filtered, optionType: 'put' as const };
     }
 
     // For iron_condor
