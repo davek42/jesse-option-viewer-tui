@@ -206,6 +206,52 @@ function createStrategyByType(
 }
 
 /**
+ * Get strategy-specific status message for leg selection
+ */
+function getSelectionStatusMessage(
+  strategyType: StrategyType,
+  legNumber: number,
+  strikePrice: number,
+  isComplete: boolean
+): string {
+  const strike = `$${strikePrice.toFixed(2)}`;
+
+  if (isComplete) {
+    return 'All legs selected. Press Enter to SAVE strategy';
+  }
+
+  switch (strategyType) {
+    case 'bear_put_spread':
+      if (legNumber === 1) {
+        return `✓ LONG PUT (Buy) at ${strike} selected. Now select SHORT PUT (Sell - lower strike)`;
+      }
+      return `✓ SHORT PUT (Sell) at ${strike} selected. Press Enter to SAVE strategy`;
+
+    case 'long_straddle':
+      if (legNumber === 1) {
+        return `✓ ATM CALL at ${strike} selected. Now select ATM PUT (same strike: ${strike})`;
+      }
+      return `✓ ATM PUT at ${strike} selected. Press Enter to SAVE strategy`;
+
+    case 'iron_condor':
+      if (legNumber === 1) {
+        return `✓ BUY OTM PUT (lowest) at ${strike}. Select leg 2: SELL PUT (higher strike)`;
+      } else if (legNumber === 2) {
+        return `✓ SELL PUT at ${strike}. Select leg 3: SELL CALL (even higher strike)`;
+      } else if (legNumber === 3) {
+        return `✓ SELL CALL at ${strike}. Select leg 4: BUY OTM CALL (highest strike)`;
+      }
+      return `✓ BUY OTM CALL at ${strike} selected. Press Enter to SAVE strategy`;
+
+    case 'covered_call':
+      return `✓ OTM CALL at ${strike} selected. Press Enter to SAVE (assumes you own 100 shares)`;
+
+    default:
+      return `Leg ${legNumber} selected. Select leg ${legNumber + 1}`;
+  }
+}
+
+/**
  * Handle option selection and update state accordingly
  */
 function handleOptionSelection(
@@ -221,10 +267,10 @@ function handleOptionSelection(
       dispatch({ type: 'SET_LONG_CALL', payload: selectedOption });
       dispatch({ type: 'SET_BUILDER_STEP', payload: 'short' });
       setHighlightedIndex(0);
-      dispatch({ type: 'SET_STATUS', payload: { message: 'Long call selected. Now select SHORT call (higher strike)', type: 'success' } });
+      dispatch({ type: 'SET_STATUS', payload: { message: `✓ LONG CALL (Buy) at $${selectedOption.strikePrice.toFixed(2)} selected. Now select SHORT CALL (Sell - higher strike)`, type: 'success' } });
     } else if (step === 'short') {
       dispatch({ type: 'SET_SHORT_CALL', payload: selectedOption });
-      dispatch({ type: 'SET_STATUS', payload: { message: 'Short call selected. Press Enter again to SAVE strategy', type: 'success' } });
+      dispatch({ type: 'SET_STATUS', payload: { message: `✓ SHORT CALL (Sell) at $${selectedOption.strikePrice.toFixed(2)} selected. Press Enter to SAVE strategy`, type: 'success' } });
     }
     return;
   }
@@ -235,15 +281,17 @@ function handleOptionSelection(
   // Determine next step
   const legNumber = parseInt(step.replace('leg', ''));
   const totalLegs = getLegCountForStrategy(strategyType);
+  const isComplete = legNumber >= totalLegs;
 
-  if (legNumber < totalLegs) {
+  if (!isComplete) {
     const nextStep = `leg${legNumber + 1}` as 'leg1' | 'leg2' | 'leg3' | 'leg4';
     dispatch({ type: 'SET_BUILDER_STEP', payload: nextStep });
     setHighlightedIndex(0);
-    dispatch({ type: 'SET_STATUS', payload: { message: `Leg ${legNumber} selected. Select leg ${legNumber + 1}`, type: 'success' } });
-  } else {
-    dispatch({ type: 'SET_STATUS', payload: { message: 'All legs selected. Press Enter to SAVE strategy', type: 'success' } });
   }
+
+  // Set strategy-specific status message
+  const message = getSelectionStatusMessage(strategyType, legNumber, selectedOption.strikePrice, isComplete);
+  dispatch({ type: 'SET_STATUS', payload: { message, type: 'success' } });
 }
 
 /**
