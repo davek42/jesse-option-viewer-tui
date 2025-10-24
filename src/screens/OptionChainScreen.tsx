@@ -28,8 +28,8 @@ interface OptionChainScreenProps {
   /** Whether strategy builder mode is active */
   strategyBuilderActive?: boolean;
 
-  /** Current builder selection step */
-  builderStep?: 'long' | 'short';
+  /** Current builder selection step (Task #9 - Multi-strategy support) */
+  builderStep?: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4';
 
   /** Selected long call for strategy */
   selectedLongCall?: OptionContract | null;
@@ -233,9 +233,13 @@ export function OptionChainScreen({
       {strategyBuilderActive && optionChain ? (
         <Box marginBottom={2}>
           <StrategyBuilder
+            strategyType={'bull_call_spread'} // TODO: Get from state when multi-strategy is fully implemented
             calls={optionChain.calls}
+            puts={optionChain.puts}
+            stockPrice={stockQuote?.price || 0}
             longCall={selectedLongCall}
             shortCall={selectedShortCall}
+            selectedLegs={[]}
             selectionStep={builderStep}
             highlightedIndex={highlightedIndex}
             quantity={1}

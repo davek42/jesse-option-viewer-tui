@@ -11,11 +11,20 @@ import { OptionChainViewScreen } from './screens/OptionChainViewScreen.js';
 import { SavedStrategiesScreen } from './screens/SavedStrategiesScreen.js';
 import { OptionChainScreen } from './screens/OptionChainScreen.js';
 import { TerminalSizeWarning } from './components/TerminalSizeWarning.js';
+import { StrategySelector } from './components/StrategySelector.js';
 import { getATMIndex } from './components/OptionChain.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
 import { useTerminalSize, calculateSafeDisplayLimit } from './hooks/useTerminalSize.js';
-import { createBullCallSpread } from './utils/strategies.js';
+import {
+  createBullCallSpread,
+  createBearPutSpread,
+  createLongStraddle,
+  createIronCondor,
+  createCoveredCall,
+  getStrategyDisplayName
+} from './utils/strategies.js';
+import type { StrategyType, OptionContract, OptionStrategy, AppAction } from './types/index.js';
 
 // Navigation state context for option chain screen
 interface NavigationState {
@@ -59,6 +68,200 @@ function NavigationProvider({ children }: { children: React.ReactNode }) {
       {children}
     </NavigationContext.Provider>
   );
+}
+
+// AIDEV-NOTE: Task #9 - Strategy building helper functions
+
+/**
+ * Get available options for the current step based on strategy type
+ */
+function getAvailableOptionsForStep(
+  strategyType: StrategyType,
+  step: string,
+  calls: OptionContract[],
+  puts: OptionContract[],
+  selectedLongCall: OptionContract | null,
+  selectedLegs: OptionContract[]
+): OptionContract[] {
+  switch (strategyType) {
+    case 'bull_call_spread':
+      // Step 1 (long): All calls | Step 2 (short): Higher strike calls
+      return step === 'long'
+        ? calls
+        : calls.filter(c => selectedLongCall ? c.strikePrice > selectedLongCall.strikePrice : true);
+
+    case 'bear_put_spread':
+      // Step 1 (leg1): All puts | Step 2 (leg2): Lower strike puts
+      return step === 'leg1'
+        ? puts
+        : puts.filter(p => selectedLegs[0] ? p.strikePrice < selectedLegs[0].strikePrice : true);
+
+    case 'long_straddle':
+      // Step 1 (leg1): All calls | Step 2 (leg2): Puts with same strike as selected call
+      if (step === 'leg1') {
+        return calls;
+      } else {
+        const selectedCall = selectedLegs.find(leg => leg.optionType === 'call');
+        return selectedCall
+          ? puts.filter(p => p.strikePrice === selectedCall.strikePrice)
+          : puts;
+      }
+
+    case 'iron_condor':
+      // 4 legs: Buy low put, Sell higher put, Sell lower call, Buy high call
+      if (step === 'leg1') return puts; // Buy OTM put (lowest)
+      if (step === 'leg2') return puts.filter(p => selectedLegs[0] ? p.strikePrice > selectedLegs[0].strikePrice : true); // Sell put
+      if (step === 'leg3') return calls.filter(c => selectedLegs[1] ? c.strikePrice > selectedLegs[1].strikePrice : true); // Sell call
+      if (step === 'leg4') return calls.filter(c => selectedLegs[2] ? c.strikePrice > selectedLegs[2].strikePrice : true); // Buy call
+      return [];
+
+    case 'covered_call':
+      // Just need to select one OTM call
+      return calls;
+
+    default:
+      return calls;
+  }
+}
+
+/**
+ * Check if strategy is complete and ready to save
+ */
+function isStrategyComplete(
+  strategyType: StrategyType,
+  selectedLongCall: OptionContract | null,
+  selectedShortCall: OptionContract | null,
+  selectedLegs: OptionContract[]
+): boolean {
+  switch (strategyType) {
+    case 'bull_call_spread':
+      return selectedLongCall !== null && selectedShortCall !== null;
+
+    case 'bear_put_spread':
+      return selectedLegs.length === 2;
+
+    case 'long_straddle':
+      return selectedLegs.length === 2;
+
+    case 'iron_condor':
+      return selectedLegs.length === 4;
+
+    case 'covered_call':
+      return selectedLegs.length === 1 || selectedLongCall !== null;
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Create strategy using the appropriate create function
+ */
+function createStrategyByType(
+  strategyType: StrategyType,
+  symbol: string,
+  selectedLongCall: OptionContract | null,
+  selectedShortCall: OptionContract | null,
+  selectedLegs: OptionContract[],
+  stockPrice: number
+): OptionStrategy | null {
+  switch (strategyType) {
+    case 'bull_call_spread':
+      return selectedLongCall && selectedShortCall
+        ? createBullCallSpread(symbol, selectedLongCall, selectedShortCall, 1)
+        : null;
+
+    case 'bear_put_spread': {
+      const [longPut, shortPut] = selectedLegs;
+      return longPut && shortPut
+        ? createBearPutSpread(symbol, longPut, shortPut, 1)
+        : null;
+    }
+
+    case 'long_straddle': {
+      const call = selectedLegs.find(leg => leg.optionType === 'call');
+      const put = selectedLegs.find(leg => leg.optionType === 'put');
+      return call && put
+        ? createLongStraddle(symbol, call, put, 1)
+        : null;
+    }
+
+    case 'iron_condor': {
+      const [leg1, leg2, leg3, leg4] = selectedLegs;
+      return leg1 && leg2 && leg3 && leg4
+        ? createIronCondor(symbol, leg1, leg2, leg3, leg4, 1)
+        : null;
+    }
+
+    case 'covered_call': {
+      const call = selectedLegs[0] || selectedLongCall;
+      return call
+        ? createCoveredCall(symbol, call, stockPrice, 1)
+        : null;
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Handle option selection and update state accordingly
+ */
+function handleOptionSelection(
+  strategyType: StrategyType,
+  step: string,
+  selectedOption: OptionContract,
+  dispatch: React.Dispatch<AppAction>,
+  setHighlightedIndex: (index: number | ((prev: number) => number)) => void
+): void {
+  // Bull Call Spread uses legacy longCall/shortCall state
+  if (strategyType === 'bull_call_spread') {
+    if (step === 'long') {
+      dispatch({ type: 'SET_LONG_CALL', payload: selectedOption });
+      dispatch({ type: 'SET_BUILDER_STEP', payload: 'short' });
+      setHighlightedIndex(0);
+      dispatch({ type: 'SET_STATUS', payload: { message: 'Long call selected. Now select SHORT call (higher strike)', type: 'success' } });
+    } else if (step === 'short') {
+      dispatch({ type: 'SET_SHORT_CALL', payload: selectedOption });
+      dispatch({ type: 'SET_STATUS', payload: { message: 'Short call selected. Press Enter again to SAVE strategy', type: 'success' } });
+    }
+    return;
+  }
+
+  // All other strategies use selectedLegs array
+  dispatch({ type: 'ADD_LEG', payload: selectedOption });
+
+  // Determine next step
+  const legNumber = parseInt(step.replace('leg', ''));
+  const totalLegs = getLegCountForStrategy(strategyType);
+
+  if (legNumber < totalLegs) {
+    const nextStep = `leg${legNumber + 1}` as 'leg1' | 'leg2' | 'leg3' | 'leg4';
+    dispatch({ type: 'SET_BUILDER_STEP', payload: nextStep });
+    setHighlightedIndex(0);
+    dispatch({ type: 'SET_STATUS', payload: { message: `Leg ${legNumber} selected. Select leg ${legNumber + 1}`, type: 'success' } });
+  } else {
+    dispatch({ type: 'SET_STATUS', payload: { message: 'All legs selected. Press Enter to SAVE strategy', type: 'success' } });
+  }
+}
+
+/**
+ * Get total number of legs for a strategy type
+ */
+function getLegCountForStrategy(strategyType: StrategyType): number {
+  switch (strategyType) {
+    case 'bull_call_spread':
+    case 'bear_put_spread':
+    case 'long_straddle':
+      return 2;
+    case 'iron_condor':
+      return 4;
+    case 'covered_call':
+      return 1;
+    default:
+      return 2;
+  }
 }
 
 /**
@@ -225,51 +428,102 @@ function GlobalInputHandler() {
     if (currentScreen === 'symbolDetail') {
       // Strategy Builder Mode - Handle input when builder is active
       if (state.strategyBuilderActive) {
+        // Task #9: Strategy Selection Mode (no strategy type selected yet)
+        if (!state.selectedStrategyType) {
+          // Navigate strategy selector
+          if (key.upArrow || input === 'k') {
+            setHighlightedIndex((prev) => Math.max(0, prev - 1));
+          } else if (key.downArrow || input === 'j') {
+            // 5 available strategies
+            setHighlightedIndex((prev) => Math.min(4, prev + 1));
+          }
+          // Select strategy type
+          else if (key.return) {
+            const strategies: StrategyType[] = ['bull_call_spread', 'bear_put_spread', 'iron_condor', 'long_straddle', 'covered_call'];
+            const selectedType = strategies[highlightedIndex];
+            if (selectedType) {
+              dispatch({ type: 'SET_STRATEGY_TYPE', payload: selectedType });
+              setHighlightedIndex(0);
+              logger.info(`📋 Selected strategy type: ${selectedType}`);
+              dispatch({ type: 'SET_STATUS', payload: { message: `Building ${selectedType.replace('_', ' ')}`, type: 'success' } });
+            }
+          }
+          // Cancel strategy selection
+          else if (key.escape) {
+            dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
+            setHighlightedIndex(0);
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy builder cancelled', type: 'info' } });
+          }
+
+          // Don't process other inputs in strategy selection mode
+          return;
+        }
+
+        // Task #9: Strategy Building Mode (strategy type is selected)
         // Navigation keys
         if (key.upArrow || input === 'k') {
           setHighlightedIndex((prev) => Math.max(0, prev - 1));
         } else if (key.downArrow || input === 'j') {
-          const availableCalls = optionChain?.calls || [];
-          const filteredCalls = state.builderStep === 'long'
-            ? availableCalls
-            : availableCalls.filter(call => state.selectedLongCall ? call.strikePrice > state.selectedLongCall.strikePrice : true);
-          const maxIndex = Math.min(filteredCalls.length - 1, 9); // Limit to first 10
+          // Get available options based on strategy type and step
+          const availableOptions = getAvailableOptionsForStep(
+            state.selectedStrategyType!,
+            state.builderStep,
+            optionChain?.calls || [],
+            optionChain?.puts || [],
+            state.selectedLongCall,
+            state.selectedLegs
+          );
+          const maxIndex = Math.min(availableOptions.length - 1, 9); // Limit to first 10
           setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
         }
 
         // Select option or save strategy
         else if (key.return) {
-          // Save strategy if both calls are selected
-          if (state.selectedLongCall && state.selectedShortCall && currentSymbol) {
-            const strategy = createBullCallSpread(currentSymbol, state.selectedLongCall, state.selectedShortCall, 1);
+          // Check if strategy is complete and ready to save
+          const isComplete = isStrategyComplete(state.selectedStrategyType!, state.selectedLongCall, state.selectedShortCall, state.selectedLegs);
+
+          if (isComplete && currentSymbol) {
+            // Save the strategy
+            const strategy = createStrategyByType(
+              state.selectedStrategyType!,
+              currentSymbol,
+              state.selectedLongCall,
+              state.selectedShortCall,
+              state.selectedLegs,
+              state.stockQuote?.price || 0
+            );
+
             if (strategy) {
               dispatch({ type: 'ADD_STRATEGY', payload: strategy });
               dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
               setHighlightedIndex(0);
-              dispatch({ type: 'SET_STATUS', payload: { message: '✓ Bull Call Spread saved!', type: 'success' } });
+              dispatch({ type: 'SET_STATUS', payload: { message: `✓ ${getStrategyDisplayName(state.selectedStrategyType!)} saved!`, type: 'success' } });
               logger.success(`💼 Strategy saved: ${strategy.type} for ${currentSymbol}`);
             } else {
               dispatch({ type: 'SET_STATUS', payload: { message: 'Invalid strategy configuration', type: 'error' } });
             }
           }
-          // Select long or short call
+          // Select option for current step
           else {
-            const availableCalls = optionChain?.calls || [];
-            const filteredCalls = state.builderStep === 'long'
-              ? availableCalls
-              : availableCalls.filter(call => state.selectedLongCall ? call.strikePrice > state.selectedLongCall.strikePrice : true);
-            const selectedCall = filteredCalls[highlightedIndex];
+            const availableOptions = getAvailableOptionsForStep(
+              state.selectedStrategyType!,
+              state.builderStep,
+              optionChain?.calls || [],
+              optionChain?.puts || [],
+              state.selectedLongCall,
+              state.selectedLegs
+            );
+            const selectedOption = availableOptions[highlightedIndex];
 
-            if (selectedCall) {
-              if (state.builderStep === 'long') {
-                dispatch({ type: 'SET_LONG_CALL', payload: selectedCall });
-                dispatch({ type: 'SET_BUILDER_STEP', payload: 'short' });
-                setHighlightedIndex(0);
-                dispatch({ type: 'SET_STATUS', payload: { message: 'Long call selected. Now select SHORT call (higher strike)', type: 'success' } });
-              } else if (state.builderStep === 'short') {
-                dispatch({ type: 'SET_SHORT_CALL', payload: selectedCall });
-                dispatch({ type: 'SET_STATUS', payload: { message: 'Short call selected. Press Enter again to SAVE strategy', type: 'success' } });
-              }
+            if (selectedOption) {
+              // Handle selection based on strategy type
+              handleOptionSelection(
+                state.selectedStrategyType!,
+                state.builderStep,
+                selectedOption,
+                dispatch,
+                setHighlightedIndex
+              );
             }
           }
         }
@@ -376,13 +630,13 @@ function GlobalInputHandler() {
         }
       }
 
-      // Activate strategy builder
+      // Activate strategy builder (Task #9 - Show strategy selector first)
       else if (input === 'b') {
         if (optionChain && optionChain.calls.length > 0) {
-          logger.info('🏗️ Activating Bull Call Spread Builder');
-          dispatch({ type: 'ACTIVATE_STRATEGY_BUILDER' });
+          logger.info('🏗️ Activating Strategy Builder - Choose strategy type');
+          dispatch({ type: 'ACTIVATE_STRATEGY_BUILDER' }); // No strategy type yet - will show selector
           setHighlightedIndex(0);
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Bull Call Spread Builder: Select LONG call (buy)', type: 'info' } });
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy Builder: Choose strategy type', type: 'info' } });
         } else {
           dispatch({ type: 'SET_STATUS', payload: { message: 'Load option chain first (select expiration)', type: 'warning' } });
         }
@@ -749,8 +1003,23 @@ function AppContent() {
           />
         )}
 
-        {/* Strategy Builder Modal (overlays Symbol Detail) */}
-        {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && (
+        {/* Task #9: Strategy Selector Modal (show when no strategy type selected) */}
+        {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && !state.selectedStrategyType && (
+          <Box paddingY={1}>
+            <StrategySelector
+              highlightedIndex={highlightedIndex}
+              onSelect={() => {
+                // Selection handled by GlobalInputHandler
+              }}
+              onCancel={() => {
+                // Cancel handled by GlobalInputHandler
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Task #9: Strategy Builder Modal (show when strategy type is selected) */}
+        {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && state.selectedStrategyType && (
           <OptionChainScreen
             currentFocus={'expiration'}
             highlightedIndex={highlightedIndex}

@@ -140,11 +140,14 @@ export interface AppState {
   loading: boolean;
   error: string | null;
 
-  // Strategy builder state
+  // Strategy builder state (Task #9 - Multi-strategy support)
   strategyBuilderActive: boolean;
-  builderStep: 'long' | 'short';
+  selectedStrategyType: StrategyType | null;
+  builderStep: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4';
   selectedLongCall: OptionContract | null;
   selectedShortCall: OptionContract | null;
+  // Generic legs for multi-strategy support
+  selectedLegs: OptionContract[];
 }
 
 /**
@@ -172,8 +175,11 @@ export type AppAction =
   | { type: 'SET_DISPLAY_LIMIT'; payload: number }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'ACTIVATE_STRATEGY_BUILDER' }
+  | { type: 'ACTIVATE_STRATEGY_BUILDER'; payload?: StrategyType }
   | { type: 'DEACTIVATE_STRATEGY_BUILDER' }
-  | { type: 'SET_BUILDER_STEP'; payload: 'long' | 'short' }
+  | { type: 'SET_STRATEGY_TYPE'; payload: StrategyType }
+  | { type: 'SET_BUILDER_STEP'; payload: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4' }
   | { type: 'SET_LONG_CALL'; payload: OptionContract | null }
-  | { type: 'SET_SHORT_CALL'; payload: OptionContract | null };
+  | { type: 'SET_SHORT_CALL'; payload: OptionContract | null }
+  | { type: 'ADD_LEG'; payload: OptionContract }
+  | { type: 'CLEAR_LEGS' };

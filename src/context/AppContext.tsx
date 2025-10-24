@@ -40,11 +40,13 @@ const initialState: AppState = {
   loading: false,
   error: null,
 
-  // Strategy builder state
+  // Strategy builder state (Task #9 - Multi-strategy support)
   strategyBuilderActive: false,
+  selectedStrategyType: null,
   builderStep: 'long',
   selectedLongCall: null,
   selectedShortCall: null,
+  selectedLegs: [],
 };
 
 /**
@@ -222,23 +224,36 @@ function appReducer(state: AppState, action: AppAction): AppState {
         error: action.payload,
       };
 
-    // Strategy builder actions
+    // Strategy builder actions (Task #9 - Multi-strategy support)
     case 'ACTIVATE_STRATEGY_BUILDER':
       return {
         ...state,
         strategyBuilderActive: true,
+        selectedStrategyType: action.payload || null,
         builderStep: 'long',
         selectedLongCall: null,
         selectedShortCall: null,
+        selectedLegs: [],
       };
 
     case 'DEACTIVATE_STRATEGY_BUILDER':
       return {
         ...state,
         strategyBuilderActive: false,
+        selectedStrategyType: null,
         builderStep: 'long',
         selectedLongCall: null,
         selectedShortCall: null,
+        selectedLegs: [],
+      };
+
+    case 'SET_STRATEGY_TYPE':
+      return {
+        ...state,
+        selectedStrategyType: action.payload,
+        selectedLegs: [], // Clear legs when changing strategy type
+        // Set initial builder step based on strategy type
+        builderStep: action.payload === 'bull_call_spread' ? 'long' : 'leg1',
       };
 
     case 'SET_BUILDER_STEP':
@@ -257,6 +272,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         selectedShortCall: action.payload,
+      };
+
+    case 'ADD_LEG':
+      return {
+        ...state,
+        selectedLegs: [...state.selectedLegs, action.payload],
+      };
+
+    case 'CLEAR_LEGS':
+      return {
+        ...state,
+        selectedLegs: [],
       };
 
     default:
