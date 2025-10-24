@@ -193,6 +193,284 @@ export function createBearPutSpread(
 }
 
 /**
+ * Calculate Long Straddle strategy metrics (Task #9)
+ *
+ * Long Straddle:
+ * - BUY 1 ATM call
+ * - BUY 1 ATM put (same strike as call)
+ * - High volatility strategy - profit from large move in either direction
+ */
+export function calculateLongStraddle(
+  call: OptionContract,
+  put: OptionContract,
+  quantity: number = 1
+): {
+  netDebit: number;
+  maxLoss: number;
+  maxGain: number;
+  upperBreakEven: number;
+  lowerBreakEven: number;
+  profitPotential: number;
+} | null {
+  // Validation
+  if (call.optionType !== 'call' || put.optionType !== 'put') {
+    return null;
+  }
+
+  // Must be same strike (ATM straddle)
+  if (call.strikePrice !== put.strikePrice) {
+    return null;
+  }
+
+  if (call.expirationDate !== put.expirationDate) {
+    return null;
+  }
+
+  // Calculate costs (buy both at ask)
+  const callCost = call.ask * quantity * 100;
+  const putCost = put.ask * quantity * 100;
+
+  const netDebit = callCost + putCost;
+  const maxLoss = netDebit;
+
+  // Max gain is theoretically unlimited (stock can go to infinity or zero)
+  // We'll use a practical placeholder
+  const maxGain = Infinity;
+
+  // Break-even points
+  const strike = call.strikePrice;
+  const premiumPerShare = netDebit / (100 * quantity);
+  const upperBreakEven = strike + premiumPerShare;
+  const lowerBreakEven = strike - premiumPerShare;
+
+  // Profit potential - undefined for unlimited gain
+  const profitPotential = Infinity;
+
+  return {
+    netDebit,
+    maxLoss,
+    maxGain,
+    upperBreakEven,
+    lowerBreakEven,
+    profitPotential,
+  };
+}
+
+/**
+ * Create a Long Straddle strategy object (Task #9)
+ */
+export function createLongStraddle(
+  symbol: string,
+  call: OptionContract,
+  put: OptionContract,
+  quantity: number = 1
+): OptionStrategy | null {
+  const metrics = calculateLongStraddle(call, put, quantity);
+  if (!metrics) return null;
+
+  const id = `long-straddle-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  return {
+    id,
+    type: 'long_straddle',
+    symbol,
+    legs: [call, put],
+    maxLoss: metrics.maxLoss,
+    maxGain: metrics.maxGain === Infinity ? 999999 : metrics.maxGain, // Cap for display
+    breakEvenPrices: [metrics.lowerBreakEven, metrics.upperBreakEven],
+    createdAt: new Date(),
+  };
+}
+
+/**
+ * Calculate Iron Condor strategy metrics (Task #9)
+ *
+ * Iron Condor:
+ * - SELL OTM call spread (sell lower strike call, buy higher strike call)
+ * - SELL OTM put spread (sell higher strike put, buy lower strike put)
+ * - Neutral range-bound strategy - profit if stock stays between short strikes
+ */
+export function calculateIronCondor(
+  longCall: OptionContract,    // Buy higher strike call (protection)
+  shortCall: OptionContract,   // Sell lower strike call (income)
+  shortPut: OptionContract,    // Sell higher strike put (income)
+  longPut: OptionContract,     // Buy lower strike put (protection)
+  quantity: number = 1
+): {
+  netCredit: number;
+  maxLoss: number;
+  maxGain: number;
+  upperBreakEven: number;
+  lowerBreakEven: number;
+  profitPotential: number;
+  riskRewardRatio: number;
+} | null {
+  // Validation
+  if (longCall.optionType !== 'call' || shortCall.optionType !== 'call' ||
+      shortPut.optionType !== 'put' || longPut.optionType !== 'put') {
+    return null;
+  }
+
+  // Strike order: longPut < shortPut < shortCall < longCall
+  if (longPut.strikePrice >= shortPut.strikePrice ||
+      shortPut.strikePrice >= shortCall.strikePrice ||
+      shortCall.strikePrice >= longCall.strikePrice) {
+    return null;
+  }
+
+  // All must have same expiration
+  if (longCall.expirationDate !== shortCall.expirationDate ||
+      shortCall.expirationDate !== shortPut.expirationDate ||
+      shortPut.expirationDate !== longPut.expirationDate) {
+    return null;
+  }
+
+  // Calculate credits and debits
+  const shortCallCredit = shortCall.bid * quantity * 100;
+  const longCallCost = longCall.ask * quantity * 100;
+  const shortPutCredit = shortPut.bid * quantity * 100;
+  const longPutCost = longPut.ask * quantity * 100;
+
+  const netCredit = (shortCallCredit + shortPutCredit) - (longCallCost + longPutCost);
+  const maxGain = netCredit;
+
+  // Max loss occurs if stock moves beyond either spread
+  const callSpreadWidth = longCall.strikePrice - shortCall.strikePrice;
+  const putSpreadWidth = shortPut.strikePrice - longPut.strikePrice;
+  const maxSpreadWidth = Math.max(callSpreadWidth, putSpreadWidth);
+  const maxLoss = (maxSpreadWidth * 100 * quantity) - netCredit;
+
+  // Break-even points
+  const upperBreakEven = shortCall.strikePrice + (netCredit / (100 * quantity));
+  const lowerBreakEven = shortPut.strikePrice - (netCredit / (100 * quantity));
+
+  // Profit potential
+  const profitPotential = maxLoss > 0 ? (maxGain / maxLoss) * 100 : 0;
+  const riskRewardRatio = maxLoss > 0 ? maxGain / maxLoss : 0;
+
+  return {
+    netCredit,
+    maxLoss,
+    maxGain,
+    upperBreakEven,
+    lowerBreakEven,
+    profitPotential,
+    riskRewardRatio,
+  };
+}
+
+/**
+ * Create an Iron Condor strategy object (Task #9)
+ */
+export function createIronCondor(
+  symbol: string,
+  longCall: OptionContract,
+  shortCall: OptionContract,
+  shortPut: OptionContract,
+  longPut: OptionContract,
+  quantity: number = 1
+): OptionStrategy | null {
+  const metrics = calculateIronCondor(longCall, shortCall, shortPut, longPut, quantity);
+  if (!metrics) return null;
+
+  const id = `iron-condor-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  return {
+    id,
+    type: 'iron_condor',
+    symbol,
+    legs: [longPut, shortPut, shortCall, longCall], // Order: low to high strikes
+    maxLoss: metrics.maxLoss,
+    maxGain: metrics.maxGain,
+    breakEvenPrices: [metrics.lowerBreakEven, metrics.upperBreakEven],
+    createdAt: new Date(),
+  };
+}
+
+/**
+ * Calculate Covered Call strategy metrics (Task #9)
+ *
+ * Covered Call:
+ * - OWN 100 shares of stock
+ * - SELL 1 OTM call
+ * - Income generation strategy with limited upside
+ */
+export function calculateCoveredCall(
+  call: OptionContract,
+  stockPrice: number,
+  quantity: number = 1
+): {
+  callPremium: number;
+  maxGain: number;
+  maxLoss: number;
+  breakEven: number;
+  returnIfCalled: number;
+  returnIfCallsExpireWorthless: number;
+} | null {
+  // Validation
+  if (call.optionType !== 'call') {
+    return null;
+  }
+
+  // Calculate income from selling call
+  const callPremium = call.bid * quantity * 100;
+
+  // Stock cost (assuming we own it at current price)
+  const stockCost = stockPrice * 100 * quantity;
+
+  // Max gain: call premium + (strike - stock price) if called away
+  const capitalGain = (call.strikePrice - stockPrice) * 100 * quantity;
+  const maxGain = callPremium + (capitalGain > 0 ? capitalGain : 0);
+
+  // Max loss: entire stock value minus call premium (if stock goes to zero)
+  const maxLoss = stockCost - callPremium;
+
+  // Break-even: stock price - premium per share
+  const breakEven = stockPrice - (callPremium / (100 * quantity));
+
+  // Return if called (%)
+  const returnIfCalled = stockCost > 0 ? (maxGain / stockCost) * 100 : 0;
+
+  // Return if calls expire worthless (%)
+  const returnIfCallsExpireWorthless = stockCost > 0 ? (callPremium / stockCost) * 100 : 0;
+
+  return {
+    callPremium,
+    maxGain,
+    maxLoss,
+    breakEven,
+    returnIfCalled,
+    returnIfCallsExpireWorthless,
+  };
+}
+
+/**
+ * Create a Covered Call strategy object (Task #9)
+ */
+export function createCoveredCall(
+  symbol: string,
+  call: OptionContract,
+  stockPrice: number,
+  quantity: number = 1
+): OptionStrategy | null {
+  const metrics = calculateCoveredCall(call, stockPrice, quantity);
+  if (!metrics) return null;
+
+  const id = `covered-call-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  return {
+    id,
+    type: 'covered_call',
+    symbol,
+    legs: [call], // Only the call option (stock ownership is implied)
+    maxLoss: metrics.maxLoss,
+    maxGain: metrics.maxGain,
+    breakEvenPrices: [metrics.breakEven],
+    createdAt: new Date(),
+  };
+}
+
+/**
  * Format currency value for display
  */
 export function formatCurrency(value: number): string {
@@ -221,6 +499,9 @@ export function getStrategyDisplayName(type: StrategyType): string {
     butterfly_spread: 'Butterfly Spread',
     condor_spread: 'Condor Spread',
     strangle_spread: 'Strangle Spread',
+    iron_condor: 'Iron Condor',
+    long_straddle: 'Long Straddle',
+    covered_call: 'Covered Call',
   };
 
   return names[type] || type;
@@ -240,6 +521,9 @@ export function getStrategyDescription(type: StrategyType): string {
     butterfly_spread: 'Three strikes, four legs. Limited risk and profit. Neutral strategy.',
     condor_spread: 'Four strikes, four legs. Wider profit range than butterfly.',
     strangle_spread: 'Buy/sell OTM call and put at different strikes. High volatility play.',
+    iron_condor: 'Sell OTM call spread + OTM put spread. Range-bound neutral. Limited risk, credit received.',
+    long_straddle: 'Buy ATM call + ATM put. High volatility play. Profit from big move either direction.',
+    covered_call: 'Own 100 shares + sell OTM call. Income generation. Limited upside, downside risk.',
   };
 
   return descriptions[type] || '';

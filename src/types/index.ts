@@ -86,7 +86,10 @@ export type StrategyType =
   | 'diagonal_put_spread'
   | 'butterfly_spread'
   | 'condor_spread'
-  | 'strangle_spread';
+  | 'strangle_spread'
+  | 'iron_condor'
+  | 'long_straddle'
+  | 'covered_call';
 
 /**
  * Saved option strategy
