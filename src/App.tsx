@@ -15,6 +15,7 @@ import { getATMIndex } from './components/OptionChain.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
 import { useTerminalSize, calculateSafeDisplayLimit } from './hooks/useTerminalSize.js';
+import { createBullCallSpread } from './utils/strategies.js';
 
 // Navigation state context for option chain screen
 interface NavigationState {
@@ -222,7 +223,69 @@ function GlobalInputHandler() {
 
     // Symbol Detail screen navigation
     if (currentScreen === 'symbolDetail') {
-      // Navigation keys for expiration selector
+      // Strategy Builder Mode - Handle input when builder is active
+      if (state.strategyBuilderActive) {
+        // Navigation keys
+        if (key.upArrow || input === 'k') {
+          setHighlightedIndex((prev) => Math.max(0, prev - 1));
+        } else if (key.downArrow || input === 'j') {
+          const availableCalls = optionChain?.calls || [];
+          const filteredCalls = state.builderStep === 'long'
+            ? availableCalls
+            : availableCalls.filter(call => state.selectedLongCall ? call.strikePrice > state.selectedLongCall.strikePrice : true);
+          const maxIndex = Math.min(filteredCalls.length - 1, 9); // Limit to first 10
+          setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
+        }
+
+        // Select option or save strategy
+        else if (key.return) {
+          // Save strategy if both calls are selected
+          if (state.selectedLongCall && state.selectedShortCall && currentSymbol) {
+            const strategy = createBullCallSpread(currentSymbol, state.selectedLongCall, state.selectedShortCall, 1);
+            if (strategy) {
+              dispatch({ type: 'ADD_STRATEGY', payload: strategy });
+              dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
+              setHighlightedIndex(0);
+              dispatch({ type: 'SET_STATUS', payload: { message: '✓ Bull Call Spread saved!', type: 'success' } });
+              logger.success(`💼 Strategy saved: ${strategy.type} for ${currentSymbol}`);
+            } else {
+              dispatch({ type: 'SET_STATUS', payload: { message: 'Invalid strategy configuration', type: 'error' } });
+            }
+          }
+          // Select long or short call
+          else {
+            const availableCalls = optionChain?.calls || [];
+            const filteredCalls = state.builderStep === 'long'
+              ? availableCalls
+              : availableCalls.filter(call => state.selectedLongCall ? call.strikePrice > state.selectedLongCall.strikePrice : true);
+            const selectedCall = filteredCalls[highlightedIndex];
+
+            if (selectedCall) {
+              if (state.builderStep === 'long') {
+                dispatch({ type: 'SET_LONG_CALL', payload: selectedCall });
+                dispatch({ type: 'SET_BUILDER_STEP', payload: 'short' });
+                setHighlightedIndex(0);
+                dispatch({ type: 'SET_STATUS', payload: { message: 'Long call selected. Now select SHORT call (higher strike)', type: 'success' } });
+              } else if (state.builderStep === 'short') {
+                dispatch({ type: 'SET_SHORT_CALL', payload: selectedCall });
+                dispatch({ type: 'SET_STATUS', payload: { message: 'Short call selected. Press Enter again to SAVE strategy', type: 'success' } });
+              }
+            }
+          }
+        }
+
+        // Cancel builder
+        else if (key.escape) {
+          dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
+          setHighlightedIndex(0);
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy builder cancelled', type: 'info' } });
+        }
+
+        // Don't process other inputs in builder mode
+        return;
+      }
+
+      // Normal Mode - Navigation keys for expiration selector
       if (key.upArrow || input === 'k') {
         setHighlightedIndex((prev) => Math.max(0, prev - 1));
       } else if (key.downArrow || input === 'j') {
