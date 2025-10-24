@@ -564,9 +564,25 @@ function GlobalInputHandler() {
 
           // Debug logging for Iron Condor filtering issues
           if (state.selectedStrategyType === 'iron_condor' && (state.builderStep === 'leg2' || state.builderStep === 'leg4')) {
-            logger.debug(`Iron Condor ${state.builderStep}: ${availableOptions.length} options available, maxIndex=${maxIndex}, currentIndex=${highlightedIndex}`);
+            const totalCalls = optionChain?.calls.length || 0;
+            const totalPuts = optionChain?.puts.length || 0;
+            const optionType = state.builderStep === 'leg2' ? 'puts' : 'calls';
+            const totalOptions = state.builderStep === 'leg2' ? totalPuts : totalCalls;
+            logger.debug(`Iron Condor ${state.builderStep}: ${availableOptions.length} options available (${totalOptions} total ${optionType}), maxIndex=${maxIndex}, currentIndex=${highlightedIndex}`);
             if (availableOptions.length > 0) {
               logger.debug(`First strike: ${availableOptions[0]?.strikePrice}, Last strike: ${availableOptions[availableOptions.length - 1]?.strikePrice}`);
+            }
+            // Show what was selected in previous legs
+            if (state.builderStep === 'leg2' && state.selectedLegs[0]) {
+              logger.debug(`Leg 1 (buy put) was: ${state.selectedLegs[0].strikePrice}, filtering for puts > ${state.selectedLegs[0].strikePrice}`);
+            }
+            if (state.builderStep === 'leg4' && state.selectedLegs[2]) {
+              logger.debug(`Leg 3 (short call) was: ${state.selectedLegs[2].strikePrice}, filtering for calls > ${state.selectedLegs[2].strikePrice}`);
+              // Also show what the total call range is
+              if (optionChain?.calls && optionChain.calls.length > 0) {
+                const allCallStrikes = optionChain.calls.map(c => c.strikePrice).sort((a, b) => a - b);
+                logger.debug(`All available call strikes range: ${allCallStrikes[0]} to ${allCallStrikes[allCallStrikes.length - 1]}`);
+              }
             }
           }
 
