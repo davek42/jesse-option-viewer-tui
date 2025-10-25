@@ -13,6 +13,7 @@ import { OptionChainScreen } from './screens/OptionChainScreen.js';
 import { HelpScreen } from './screens/HelpScreen.js';
 import { TerminalSizeWarning } from './components/TerminalSizeWarning.js';
 import { StrategySelector } from './components/StrategySelector.js';
+import { SaveConfirmation } from './components/SaveConfirmation.js';
 import { getATMIndex } from './components/OptionChain.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
@@ -22,8 +23,7 @@ import {
   createBearPutSpread,
   createLongStraddle,
   createIronCondor,
-  createCoveredCall,
-  getStrategyDisplayName
+  createCoveredCall
 } from './utils/strategies.js';
 import type { StrategyType, OptionContract, OptionStrategy, AppAction } from './types/index.js';
 
@@ -576,6 +576,23 @@ function GlobalInputHandler() {
     if (currentScreen === 'symbolDetail') {
       // Strategy Builder Mode - Handle input when builder is active
       if (state.strategyBuilderActive) {
+        // Save Confirmation Mode - Handle confirmation before saving
+        if (state.showSaveConfirmation) {
+          if (key.return) {
+            // Confirm and save strategy
+            dispatch({ type: 'CONFIRM_SAVE_STRATEGY' });
+            setHighlightedIndex(0);
+            dispatch({ type: 'SET_STATUS', payload: { message: `✓ Strategy saved!`, type: 'success' } });
+            logger.success(`💼 Strategy confirmed and saved`);
+          } else if (key.escape || input === 'q') {
+            // Cancel save
+            dispatch({ type: 'HIDE_SAVE_CONFIRMATION' });
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Save cancelled', type: 'info' } });
+            logger.info(`❌ Save cancelled by user`);
+          }
+          return; // Don't process other inputs while in confirmation mode
+        }
+
         // Task #9: Strategy Selection Mode (no strategy type selected yet)
         if (!state.selectedStrategyType) {
           // Navigate strategy selector
@@ -701,11 +718,10 @@ function GlobalInputHandler() {
             );
 
             if (strategy) {
-              dispatch({ type: 'ADD_STRATEGY', payload: strategy });
-              dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
-              setHighlightedIndex(0);
-              dispatch({ type: 'SET_STATUS', payload: { message: `✓ ${getStrategyDisplayName(state.selectedStrategyType!)} saved!`, type: 'success' } });
-              logger.success(`💼 Strategy saved: ${strategy.type} for ${currentSymbol}`);
+              // Show confirmation prompt instead of saving directly
+              dispatch({ type: 'SHOW_SAVE_CONFIRMATION', payload: strategy });
+              dispatch({ type: 'SET_STATUS', payload: { message: 'Review strategy and press Enter to save, or Esc to cancel', type: 'info' } });
+              logger.info(`📋 Showing save confirmation for ${strategy.type}`);
             } else {
               dispatch({ type: 'SET_STATUS', payload: { message: 'Invalid strategy configuration', type: 'error' } });
             }
@@ -1030,11 +1046,10 @@ function GlobalInputHandler() {
             if (symbol) {
               const strategy = createBullCallSpread(symbol, selectedLongCall, selectedShortCall, 1);
               if (strategy) {
-                dispatch({ type: 'ADD_STRATEGY', payload: strategy });
-                dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
-                setHighlightedIndex(0);
-                dispatch({ type: 'SET_STATUS', payload: { message: '✓ Bull Call Spread saved!', type: 'success' } });
-                logger.success(`💼 Strategy saved: ${strategy.type} for ${symbol}`);
+                // Show confirmation prompt instead of saving directly
+                dispatch({ type: 'SHOW_SAVE_CONFIRMATION', payload: strategy });
+                dispatch({ type: 'SET_STATUS', payload: { message: 'Review strategy and press Enter to save, or Esc to cancel', type: 'info' } });
+                logger.info(`📋 Showing save confirmation for ${strategy.type}`);
               } else {
                 dispatch({ type: 'SET_STATUS', payload: { message: 'Invalid strategy configuration', type: 'error' } });
               }
@@ -1262,8 +1277,13 @@ function AppContent() {
           </Box>
         )}
 
+        {/* Save Confirmation Modal */}
+        {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && state.showSaveConfirmation && state.strategyToSave && (
+          <SaveConfirmation strategy={state.strategyToSave} />
+        )}
+
         {/* Task #9: Strategy Builder Modal (show when strategy type is selected) */}
-        {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && state.selectedStrategyType && (
+        {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && state.selectedStrategyType && !state.showSaveConfirmation && (
           <OptionChainScreen
             currentFocus={'expiration'}
             highlightedIndex={highlightedIndex}

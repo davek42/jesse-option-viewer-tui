@@ -148,6 +148,10 @@ export interface AppState {
   selectedShortCall: OptionContract | null;
   // Generic legs for multi-strategy support
   selectedLegs: OptionContract[];
+
+  // Save confirmation state
+  showSaveConfirmation: boolean;
+  strategyToSave: OptionStrategy | null;
 }
 
 /**
@@ -183,4 +187,7 @@ export type AppAction =
   | { type: 'SET_SHORT_CALL'; payload: OptionContract | null }
   | { type: 'ADD_LEG'; payload: OptionContract }
   | { type: 'REMOVE_LAST_LEG' }
-  | { type: 'CLEAR_LEGS' };
+  | { type: 'CLEAR_LEGS' }
+  | { type: 'SHOW_SAVE_CONFIRMATION'; payload: OptionStrategy }
+  | { type: 'HIDE_SAVE_CONFIRMATION' }
+  | { type: 'CONFIRM_SAVE_STRATEGY' };

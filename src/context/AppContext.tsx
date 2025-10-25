@@ -47,6 +47,10 @@ const initialState: AppState = {
   selectedLongCall: null,
   selectedShortCall: null,
   selectedLegs: [],
+
+  // Save confirmation state
+  showSaveConfirmation: false,
+  strategyToSave: null,
 };
 
 /**
@@ -289,6 +293,35 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'CLEAR_LEGS':
       return {
         ...state,
+        selectedLegs: [],
+      };
+
+    case 'SHOW_SAVE_CONFIRMATION':
+      return {
+        ...state,
+        showSaveConfirmation: true,
+        strategyToSave: action.payload,
+      };
+
+    case 'HIDE_SAVE_CONFIRMATION':
+      return {
+        ...state,
+        showSaveConfirmation: false,
+        strategyToSave: null,
+      };
+
+    case 'CONFIRM_SAVE_STRATEGY':
+      if (!state.strategyToSave) return state;
+      return {
+        ...state,
+        savedStrategies: [...state.savedStrategies, state.strategyToSave],
+        showSaveConfirmation: false,
+        strategyToSave: null,
+        strategyBuilderActive: false,
+        selectedStrategyType: null,
+        builderStep: 'long',
+        selectedLongCall: null,
+        selectedShortCall: null,
         selectedLegs: [],
       };
 
