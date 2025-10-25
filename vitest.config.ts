@@ -15,7 +15,6 @@ export default defineConfig({
         'node_modules/',
         'tests/',
         'src/index.tsx',
-        'src/test-api.ts',
         'dist/',
       ],
       include: ['src/**/*.ts', 'src/**/*.tsx'],

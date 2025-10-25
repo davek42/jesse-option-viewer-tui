@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // AIDEV-NOTE: Test script to verify Alpaca options API implementation
 
-import { getAlpacaClient } from './lib/alpaca.js';
-import { logger } from './utils/logger.js';
+import { getAlpacaClient } from '../src/lib/alpaca.js';
+import { logger } from '../src/utils/logger.js';
 
 async function testAlpacaAPI() {
   logger.info('🧪 Starting Alpaca Options API Test...\n');
