@@ -444,6 +444,16 @@ export function StrategyBuilder({
                     logger.debug(`🔍 DISPLAY: 🎯 RENDERING HIGHLIGHTED: displayIndex=${displayIndex}, actualIndex=${actualIndex}, strikePrice=${option.strikePrice}`);
                   }
 
+                  // Calculate bid-ask spread percentage
+                  const midpoint = (option.bid + option.ask) / 2;
+                  const spreadPercentage = midpoint > 0 ? ((option.ask - option.bid) / midpoint) * 100 : 0;
+                  const hasWideSpread = spreadPercentage > 5;
+                  const spreadColor = isHighlighted
+                    ? textColor
+                    : hasWideSpread
+                    ? (spreadPercentage > 10 ? 'red' : 'yellow')
+                    : textColor;
+
                   return (
                     <Box key={option.symbol}>
                       <Box width={12}>
@@ -452,7 +462,7 @@ export function StrategyBuilder({
                         </Text>
                       </Box>
                       <Box width={10}>
-                        <Text color={textColor} backgroundColor={bgColor}>
+                        <Text color={spreadColor} backgroundColor={bgColor}>
                           ${safeToFixed(option.bid, 2)}/${safeToFixed(option.ask, 2)}
                         </Text>
                       </Box>

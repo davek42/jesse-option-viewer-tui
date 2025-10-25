@@ -258,6 +258,27 @@ export function OptionChain({
 
           const textColor = isHighlighted || isATM ? 'black' : 'white';
 
+          // Calculate bid-ask spread percentages for highlighting wide spreads
+          const callSpreadPercentage = call ? (() => {
+            const midpoint = (call.bid + call.ask) / 2;
+            return midpoint > 0 ? ((call.ask - call.bid) / midpoint) * 100 : 0;
+          })() : 0;
+          const putSpreadPercentage = put ? (() => {
+            const midpoint = (put.bid + put.ask) / 2;
+            return midpoint > 0 ? ((put.ask - put.bid) / midpoint) * 100 : 0;
+          })() : 0;
+
+          const callSpreadColor = isHighlighted || isATM
+            ? textColor
+            : callSpreadPercentage > 5
+            ? (callSpreadPercentage > 10 ? 'red' : 'yellow')
+            : textColor;
+          const putSpreadColor = isHighlighted || isATM
+            ? textColor
+            : putSpreadPercentage > 5
+            ? (putSpreadPercentage > 10 ? 'red' : 'yellow')
+            : textColor;
+
           return (
             <Box key={strike} marginBottom={0}>
               {/* CALL side */}
@@ -265,12 +286,12 @@ export function OptionChain({
                 {call ? (
                   <>
                     <Box width={8}>
-                      <Text color={textColor} backgroundColor={bgColor}>
+                      <Text color={callSpreadColor} backgroundColor={bgColor}>
                         {safeToFixed(call.bid, 2)}
                       </Text>
                     </Box>
                     <Box width={8}>
-                      <Text color={textColor} backgroundColor={bgColor}>
+                      <Text color={callSpreadColor} backgroundColor={bgColor}>
                         {safeToFixed(call.ask, 2)}
                       </Text>
                     </Box>
@@ -349,12 +370,12 @@ export function OptionChain({
                       </Text>
                     </Box>
                     <Box width={8}>
-                      <Text color={textColor} backgroundColor={bgColor}>
+                      <Text color={putSpreadColor} backgroundColor={bgColor}>
                         {safeToFixed(put.ask, 2)}
                       </Text>
                     </Box>
                     <Box width={8}>
-                      <Text color={textColor} backgroundColor={bgColor}>
+                      <Text color={putSpreadColor} backgroundColor={bgColor}>
                         {safeToFixed(put.bid, 2)}
                       </Text>
                     </Box>
