@@ -41,7 +41,7 @@ export function HelpScreen() {
         <Box marginTop={1} flexDirection="column">
           <Box>
             <Box width={20}>
-              <Text color="cyan">h</Text> or <Text color="cyan">?</Text>
+              <Text color="cyan">h</Text><Text> or </Text><Text color="cyan">?</Text>
             </Box>
             <Text>Show this help screen</Text>
           </Box>
@@ -78,7 +78,7 @@ export function HelpScreen() {
           </Box>
           <Box>
             <Box width={20}>
-              <Text color="cyan">h</Text> or <Text color="cyan">?</Text>
+              <Text color="cyan">h</Text><Text> or </Text><Text color="cyan">?</Text>
             </Box>
             <Text>Show help</Text>
           </Box>
@@ -134,7 +134,7 @@ export function HelpScreen() {
         <Box marginTop={1} flexDirection="column">
           <Box>
             <Box width={20}>
-              <Text color="cyan">↑↓</Text> or <Text color="cyan">j/k</Text>
+              <Text color="cyan">↑↓</Text><Text> or </Text><Text color="cyan">j/k</Text>
             </Box>
             <Text>Navigate strikes (one at a time)</Text>
           </Box>
@@ -186,7 +186,7 @@ export function HelpScreen() {
         <Box marginTop={1} flexDirection="column">
           <Box>
             <Box width={20}>
-              <Text color="cyan">↑↓</Text> or <Text color="cyan">j/k</Text>
+              <Text color="cyan">↑↓</Text><Text> or </Text><Text color="cyan">j/k</Text>
             </Box>
             <Text>Navigate options</Text>
           </Box>
@@ -204,7 +204,7 @@ export function HelpScreen() {
           </Box>
           <Box>
             <Box width={20}>
-              <Text color="cyan">q</Text> or <Text color="cyan">Esc</Text>
+              <Text color="cyan">q</Text><Text> or </Text><Text color="cyan">Esc</Text>
             </Box>
             <Text>Cancel strategy builder</Text>
           </Box>
@@ -220,7 +220,7 @@ export function HelpScreen() {
         <Box marginTop={1} flexDirection="column">
           <Box>
             <Box width={20}>
-              <Text color="cyan">↑↓</Text> or <Text color="cyan">j/k</Text>
+              <Text color="cyan">↑↓</Text><Text> or </Text><Text color="cyan">j/k</Text>
             </Box>
             <Text>Navigate strategies</Text>
           </Box>
