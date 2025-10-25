@@ -842,11 +842,16 @@ function GlobalInputHandler() {
 
     // Option Chain View screen navigation
     if (currentScreen === 'optionChainView') {
+      // Calculate total strikes for boundary checking
+      const totalStrikes = optionChain
+        ? [...new Set([...optionChain.calls.map(c => c.strikePrice), ...optionChain.puts.map(p => p.strikePrice)])].length
+        : 0;
+
       // Single-line navigation
       if (key.upArrow || input === 'k') {
         setHighlightedIndex((prev) => Math.max(0, prev - 1));
       } else if (key.downArrow || input === 'j') {
-        setHighlightedIndex((prev) => prev + 1);
+        setHighlightedIndex((prev) => Math.min(totalStrikes - 1, prev + 1));
       }
 
       // Jump to ATM (Phase 3.3) - 'a' key

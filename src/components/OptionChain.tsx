@@ -43,54 +43,31 @@ function findATMStrike(calls: OptionContract[], puts: OptionContract[], stockPri
 }
 
 /**
- * Get the index of the ATM strike in the displayed strikes array
- * Use this to auto-center the option chain view on the ATM strike
+ * Get the index of the ATM strike in the allStrikes array
+ * Use this to position the highlight on the ATM strike
  *
  * @param calls - Array of call options
  * @param puts - Array of put options
  * @param stockPrice - Current underlying stock price
- * @param displayLimit - Display limit (10, 40, or -1 for all)
- * @returns Index of ATM strike in the display array (for setting highlightedRow)
+ * @param displayLimit - Display limit (not used, kept for API compatibility)
+ * @returns Index of ATM strike in allStrikes array (for setting highlightedRow)
  */
 export function getATMIndex(
   calls: OptionContract[],
   puts: OptionContract[],
   stockPrice: number,
-  displayLimit: number
+  _displayLimit: number // Kept for API compatibility but not used
 ): number {
-  const displayStrikes = getCenteredStrikes(calls, puts, stockPrice, displayLimit);
-  const atmStrike = findATMStrike(calls, puts, stockPrice);
-  const atmIndex = displayStrikes.indexOf(atmStrike);
-
-  // If ATM strike not found in display, return middle of display
-  return atmIndex !== -1 ? atmIndex : Math.floor(displayStrikes.length / 2);
-}
-
-/**
- * Get centered strikes around ATM for display
- */
-function getCenteredStrikes(
-  calls: OptionContract[],
-  puts: OptionContract[],
-  stockPrice: number,
-  displayLimit: number
-): number[] {
+  // Get all strikes and find ATM
   const allStrikes = [...new Set([...calls.map(c => c.strikePrice), ...puts.map(p => p.strikePrice)])].sort((a, b) => a - b);
-
-  if (displayLimit === -1 || allStrikes.length <= displayLimit) {
-    return allStrikes;
-  }
-
   const atmStrike = findATMStrike(calls, puts, stockPrice);
   const atmIndex = allStrikes.indexOf(atmStrike);
 
-  // Calculate how many strikes to show on each side
-  const half = Math.floor(displayLimit / 2);
-  const startIndex = Math.max(0, atmIndex - half);
-  const endIndex = Math.min(allStrikes.length, startIndex + displayLimit);
-
-  return allStrikes.slice(startIndex, endIndex);
+  // Return index into allStrikes (not displayStrikes)
+  return atmIndex !== -1 ? atmIndex : Math.floor(allStrikes.length / 2);
 }
+
+// AIDEV-NOTE: getCenteredStrikes removed - now using scrolling window based on highlightedRow
 
 
 /**
@@ -108,16 +85,35 @@ export function OptionChain({
 }: OptionChainProps) {
   const { calls, puts, underlyingPrice, symbol, expirationDate } = optionChain;
 
-  // Get strikes to display (centered around ATM)
-  const displayStrikes = getCenteredStrikes(calls, puts, underlyingPrice, displayLimit);
+  // Get all strikes
+  const allStrikes = [...new Set([...calls.map(c => c.strikePrice), ...puts.map(p => p.strikePrice)])].sort((a, b) => a - b);
   const atmStrike = findATMStrike(calls, puts, underlyingPrice);
+
+  // Create scrolling window based on highlightedRow (like StrategyBuilder)
+  const displayStrikes = (() => {
+    // Show all if displayLimit is -1 or we have fewer strikes than limit
+    if (displayLimit === -1 || allStrikes.length <= displayLimit) {
+      return allStrikes;
+    }
+
+    // Calculate scroll window centered on highlightedRow
+    const totalStrikes = allStrikes.length;
+    let startIndex = Math.max(0, highlightedRow - Math.floor(displayLimit / 2));
+    const endIndex = Math.min(totalStrikes, startIndex + displayLimit);
+
+    // Adjust start if we're near the end
+    if (endIndex - startIndex < displayLimit) {
+      startIndex = Math.max(0, endIndex - displayLimit);
+    }
+
+    return allStrikes.slice(startIndex, endIndex);
+  })();
 
   // Create maps for quick lookup
   const callsMap = new Map(calls.map(c => [c.strikePrice, c]));
   const putsMap = new Map(puts.map(p => [p.strikePrice, p]));
 
   // Calculate scroll indicators (Phase 3.2)
-  const allStrikes = [...new Set([...calls.map(c => c.strikePrice), ...puts.map(p => p.strikePrice)])].sort((a, b) => a - b);
   const totalStrikes = allStrikes.length;
   const isLimited = displayLimit !== -1 && displayStrikes.length < totalStrikes;
 
@@ -242,11 +238,14 @@ export function OptionChain({
 
       {/* Option rows */}
       <Box flexDirection="column">
-        {displayStrikes.map((strike, index) => {
+        {displayStrikes.map((strike) => {
           const call = callsMap.get(strike);
           const put = putsMap.get(strike);
           const isATM = strike === atmStrike;
-          const isHighlighted = isFocused && index === highlightedRow;
+
+          // Map highlightedRow (index in allStrikes) to display index
+          const actualIndex = allStrikes.indexOf(strike);
+          const isHighlighted = isFocused && actualIndex === highlightedRow;
 
           // Determine background color
           let bgColor: string | undefined;
