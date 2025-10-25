@@ -47,6 +47,12 @@ export function HelpScreen() {
           </Box>
           <Box>
             <Box width={20}>
+              <Text color="cyan">/help</Text>
+            </Box>
+            <Text>Show help screen (command mode)</Text>
+          </Box>
+          <Box>
+            <Box width={20}>
               <Text color="cyan">q</Text>
             </Box>
             <Text>Go back / Quit</Text>

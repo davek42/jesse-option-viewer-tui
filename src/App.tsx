@@ -506,6 +506,10 @@ function GlobalInputHandler() {
           } else {
             dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
           }
+        } else if (command === '/help' || command === '/h' || command === '/?') {
+          // Show help screen (global command)
+          dispatch({ type: 'SET_SCREEN', payload: 'help' });
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Showing help screen', type: 'info' } });
         } else if (command.startsWith('/')) {
           dispatch({ type: 'SET_STATUS', payload: { message: `Unknown command: ${command}`, type: 'error' } });
         }
@@ -559,13 +563,17 @@ function GlobalInputHandler() {
       return;
     }
 
+    // Global: Help screen (works on all screens except when in strategy builder or confirmation mode)
+    if ((input === 'h' || input === '?') && !state.strategyBuilderActive && !state.showSaveConfirmation) {
+      dispatch({ type: 'SET_SCREEN', payload: 'help' });
+      return;
+    }
+
     // Home screen navigation
     if (currentScreen === 'home') {
       if (input === 's') {
         dispatch({ type: 'SET_MODE', payload: 'input' });
         dispatch({ type: 'SET_STATUS', payload: { message: 'Enter stock symbol', type: 'info' } });
-      } else if (input === 'h' || input === '?') {
-        dispatch({ type: 'SET_SCREEN', payload: 'help' });
       } else if (input === 'q') {
         logger.info('👋 Exiting application...');
         exit();
@@ -1349,6 +1357,7 @@ function AppContent() {
                 <Text bold color="cyan">b</Text> Build Strategy{' '}
                 <Text bold color="cyan">v</Text> Strategies{' '}
                 <Text bold color="cyan">s</Text> Symbol{' '}
+                <Text bold color="cyan">h/?</Text> Help{' '}
                 <Text bold color="cyan">q</Text> Back
               </>
             )}
@@ -1368,6 +1377,7 @@ function AppContent() {
                 <Text bold color="cyan">↑↓/j/k</Text> Navigate{' '}
                 <Text bold color="cyan">l</Text> Limit{' '}
                 <Text bold color="cyan">g</Text> Greeks{' '}
+                <Text bold color="cyan">h/?</Text> Help{' '}
                 <Text bold color="cyan">q</Text> Back
               </>
             )}
@@ -1377,6 +1387,7 @@ function AppContent() {
               <>
                 <Text bold color="cyan">↑↓/j/k</Text> Navigate{' '}
                 <Text bold color="cyan">x</Text> Delete{' '}
+                <Text bold color="cyan">h/?</Text> Help{' '}
                 <Text bold color="cyan">q</Text> Back
               </>
             )}
