@@ -1,5 +1,5 @@
 {
-  "name": "option-viewer-tui",
+  "name": "jesse-option-viewer-tui",
   "version": "0.1.0",
   "description": "Terminal UI application for viewing option chains using Alpaca Markets API",
   "type": "module",
