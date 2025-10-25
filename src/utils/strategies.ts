@@ -528,3 +528,58 @@ export function getStrategyDescription(type: StrategyType): string {
 
   return descriptions[type] || '';
 }
+
+/**
+ * Get the action (BUY/SELL) for a specific leg in a strategy
+ *
+ * @param strategyType - The type of strategy
+ * @param legIndex - The index of the leg (0-based)
+ * @returns 'buy' or 'sell'
+ */
+export function getLegAction(strategyType: StrategyType, legIndex: number): 'buy' | 'sell' {
+  // Define action patterns for each strategy type
+  const actionPatterns: Record<StrategyType, Array<'buy' | 'sell'>> = {
+    // Bull Call Spread: BUY lower strike call, SELL higher strike call
+    bull_call_spread: ['buy', 'sell'],
+
+    // Bear Put Spread: BUY higher strike put, SELL lower strike put
+    bear_put_spread: ['buy', 'sell'],
+
+    // Bull Put Spread: SELL higher strike put, BUY lower strike put
+    bull_put_spread: ['sell', 'buy'],
+
+    // Bear Call Spread: SELL lower strike call, BUY higher strike call
+    bear_call_spread: ['sell', 'buy'],
+
+    // Long Straddle: BUY call, BUY put
+    long_straddle: ['buy', 'buy'],
+
+    // Iron Condor: BUY low put, SELL high put, SELL low call, BUY high call
+    iron_condor: ['buy', 'sell', 'sell', 'buy'],
+
+    // Covered Call: SELL call (stock ownership implied)
+    covered_call: ['sell'],
+
+    // Diagonal spreads (TODO - add when implemented)
+    diagonal_call_spread: ['buy', 'sell'],
+    diagonal_put_spread: ['buy', 'sell'],
+
+    // Butterfly (TODO - add when implemented)
+    butterfly_spread: ['buy', 'sell', 'sell', 'buy'],
+
+    // Condor (TODO - add when implemented)
+    condor_spread: ['buy', 'sell', 'sell', 'buy'],
+
+    // Strangle (TODO - add when implemented)
+    strangle_spread: ['buy', 'buy'],
+  };
+
+  const pattern = actionPatterns[strategyType];
+  if (!pattern || legIndex >= pattern.length || legIndex < 0) {
+    // Default to 'buy' if pattern not found or index out of range
+    return 'buy';
+  }
+
+  const action = pattern[legIndex];
+  return action ?? 'buy'; // Ensure we never return undefined
+}

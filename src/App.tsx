@@ -73,6 +73,26 @@ function NavigationProvider({ children }: { children: React.ReactNode }) {
 // AIDEV-NOTE: Task #9 - Strategy building helper functions
 
 /**
+ * Check if a step shows all (unfiltered) options - should center on ATM
+ */
+function shouldCenterOnATM(strategyType: StrategyType, step: string): boolean {
+  switch (strategyType) {
+    case 'bull_call_spread':
+      return step === 'long'; // leg1 shows all calls
+    case 'bear_put_spread':
+      return step === 'leg1'; // leg1 shows all puts
+    case 'long_straddle':
+      return step === 'leg1'; // leg1 shows all calls
+    case 'iron_condor':
+      return step === 'leg1' || step === 'leg3'; // leg1 shows all puts, leg3 shows all calls
+    case 'covered_call':
+      return true; // shows all calls
+    default:
+      return false;
+  }
+}
+
+/**
  * Get available options for the current step based on strategy type
  */
 function getAvailableOptionsForStep(
@@ -298,7 +318,9 @@ function handleOptionSelection(
   step: string,
   selectedOption: OptionContract,
   dispatch: React.Dispatch<AppAction>,
-  setHighlightedIndex: (index: number | ((prev: number) => number)) => void
+  setHighlightedIndex: (index: number | ((prev: number) => number)) => void,
+  optionChain?: { calls: OptionContract[]; puts: OptionContract[]; underlyingPrice: number } | null,
+  displayLimit?: number
 ): void {
   // Bull Call Spread uses legacy longCall/shortCall state
   if (strategyType === 'bull_call_spread') {
@@ -325,7 +347,14 @@ function handleOptionSelection(
   if (!isComplete) {
     const nextStep = `leg${legNumber + 1}` as 'leg1' | 'leg2' | 'leg3' | 'leg4';
     dispatch({ type: 'SET_BUILDER_STEP', payload: nextStep });
-    setHighlightedIndex(0);
+
+    // Center on ATM if next leg shows all options
+    if (shouldCenterOnATM(strategyType, nextStep) && optionChain && displayLimit !== undefined) {
+      const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
+      setHighlightedIndex(atmIndex);
+    } else {
+      setHighlightedIndex(0);
+    }
   }
 
   // Set strategy-specific status message
@@ -530,7 +559,16 @@ function GlobalInputHandler() {
             const selectedType = strategies[highlightedIndex];
             if (selectedType) {
               dispatch({ type: 'SET_STRATEGY_TYPE', payload: selectedType });
-              setHighlightedIndex(0);
+
+              // Center on ATM for leg1 if showing all options
+              const firstStep = selectedType === 'bull_call_spread' ? 'long' : 'leg1';
+              if (shouldCenterOnATM(selectedType, firstStep) && optionChain) {
+                const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
+                setHighlightedIndex(atmIndex);
+              } else {
+                setHighlightedIndex(0);
+              }
+
               logger.info(`📋 Selected strategy type: ${selectedType}`);
               // Show initial instruction message
               const initialMessage = getInitialStrategyMessage(selectedType);
@@ -538,7 +576,7 @@ function GlobalInputHandler() {
             }
           }
           // Cancel strategy selection
-          else if (key.escape) {
+          else if (key.escape || input === 'q') {
             dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
             setHighlightedIndex(0);
             dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy builder cancelled', type: 'info' } });
@@ -636,14 +674,38 @@ function GlobalInputHandler() {
                 state.builderStep,
                 selectedOption,
                 dispatch,
-                setHighlightedIndex
+                setHighlightedIndex,
+                optionChain,
+                displayLimit
               );
             }
           }
         }
 
+        // Jump to specific leg with number keys (1-4) - only for multi-leg strategies
+        else if (input && ['1', '2', '3', '4'].includes(input)) {
+          const legNum = parseInt(input);
+          const legName = `leg${legNum}` as 'leg1' | 'leg2' | 'leg3' | 'leg4';
+          const totalLegs = getLegCountForStrategy(state.selectedStrategyType!);
+
+          // Only allow jumping to valid legs for this strategy
+          if (legNum <= totalLegs) {
+            dispatch({ type: 'SET_BUILDER_STEP', payload: legName });
+
+            // Center on ATM if this leg shows all options
+            if (shouldCenterOnATM(state.selectedStrategyType!, legName) && optionChain) {
+              const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
+              setHighlightedIndex(atmIndex);
+            } else {
+              setHighlightedIndex(0);
+            }
+
+            dispatch({ type: 'SET_STATUS', payload: { message: `Jumped to leg ${legNum}`, type: 'info' } });
+          }
+        }
+
         // Cancel builder
-        else if (key.escape) {
+        else if (key.escape || input === 'q') {
           dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
           setHighlightedIndex(0);
           dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy builder cancelled', type: 'info' } });
@@ -932,7 +994,7 @@ function GlobalInputHandler() {
           }
         }
         // Cancel builder
-        else if (key.escape) {
+        else if (key.escape || input === 'q') {
           dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
           setHighlightedIndex(0);
           dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy builder cancelled', type: 'info' } });

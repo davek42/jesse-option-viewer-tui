@@ -250,14 +250,33 @@ export function StrategyBuilder({
     return { availableOptions: calls, optionType: 'call' as const };
   }, [strategyType, selectionStep, calls, puts, longCall, selectedLegs]);
 
+  // Calculate current leg number and total legs
+  const totalLegs = getLegCount(strategyType);
+  const currentLegNumber = (() => {
+    if (strategyType === 'bull_call_spread') {
+      return selectionStep === 'long' ? 1 : 2;
+    }
+    // For other strategies, extract leg number from selectionStep (e.g., 'leg1' -> 1)
+    const match = selectionStep.match(/leg(\d+)/);
+    return match && match[1] ? parseInt(match[1], 10) : 1;
+  })();
+
   return (
     <Box flexDirection="column" paddingX={1} borderStyle="double" borderColor="green">
       {/* Header */}
-      <Box marginBottom={1}>
-        <Text bold color="green">
-          🏗️  {getStrategyDisplayName(strategyType)} Builder
-        </Text>
-        <Text dimColor> ({getStrategyDescription(strategyType)})</Text>
+      <Box marginBottom={1} justifyContent="space-between">
+        <Box>
+          <Text bold color="green">
+            🏗️  {getStrategyDisplayName(strategyType)} Builder
+          </Text>
+          <Text dimColor> ({getStrategyDescription(strategyType)})</Text>
+        </Box>
+        {/* Leg position indicator */}
+        <Box marginLeft={2}>
+          <Text bold color="yellow">
+            Leg {currentLegNumber}/{totalLegs}
+          </Text>
+        </Box>
       </Box>
 
       {/* Instructions */}
@@ -364,6 +383,9 @@ export function StrategyBuilder({
           <Box width={10}>
             <Text bold dimColor>Last</Text>
           </Box>
+          <Box width={8}>
+            <Text bold dimColor>Volume</Text>
+          </Box>
           <Box width={10}>
             <Text bold dimColor>Delta</Text>
           </Box>
@@ -437,6 +459,11 @@ export function StrategyBuilder({
                       <Box width={10}>
                         <Text color={textColor} backgroundColor={bgColor}>
                           ${safeToFixed(option.lastPrice, 2)}
+                        </Text>
+                      </Box>
+                      <Box width={8}>
+                        <Text color={textColor} backgroundColor={bgColor}>
+                          {option.volume || 0}
                         </Text>
                       </Box>
                       <Box width={10}>
@@ -583,6 +610,31 @@ export function StrategyBuilder({
           </Box>
         </Box>
       )}
+
+      {/* Keyboard Shortcuts Reminder */}
+      <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="gray">
+        <Box flexDirection="column">
+          <Text bold dimColor>Keyboard Shortcuts:</Text>
+          <Box marginTop={1} flexDirection="row" flexWrap="wrap">
+            <Box marginRight={2}>
+              <Text color="cyan">↑↓/j/k</Text>
+              <Text dimColor> Navigate</Text>
+            </Box>
+            <Box marginRight={2}>
+              <Text color="cyan">Enter</Text>
+              <Text dimColor> Select</Text>
+            </Box>
+            <Box marginRight={2}>
+              <Text color="cyan">1-{totalLegs}</Text>
+              <Text dimColor> Jump to leg</Text>
+            </Box>
+            <Box marginRight={2}>
+              <Text color="cyan">q/Esc</Text>
+              <Text dimColor> Cancel</Text>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
     </Box>
   );
 }

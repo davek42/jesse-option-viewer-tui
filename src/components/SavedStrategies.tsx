@@ -3,7 +3,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { OptionStrategy } from '../types/index.js';
-import { getStrategyDisplayName, formatCurrency } from '../utils/strategies.js';
+import { getStrategyDisplayName, formatCurrency, getLegAction } from '../utils/strategies.js';
 import { safeToFixed } from '../utils/formatters.js';
 
 interface SavedStrategiesProps {
@@ -72,8 +72,8 @@ export function SavedStrategies({
         <Box width={22}>
           <Text bold dimColor>Strategy</Text>
         </Box>
-        <Box width={20}>
-          <Text bold dimColor>Strikes</Text>
+        <Box width={30}>
+          <Text bold dimColor>Legs</Text>
         </Box>
         <Box width={12}>
           <Text bold dimColor>Max Loss</Text>
@@ -95,11 +95,6 @@ export function SavedStrategies({
           const isHighlighted = isFocused && index === highlightedIndex;
           const bgColor = isHighlighted ? 'cyan' : undefined;
           const textColor = isHighlighted ? 'black' : 'white';
-
-          // Extract strike prices from legs
-          const strikes = strategy.legs
-            .map(leg => `$${safeToFixed(leg.strikePrice, 2)}`)
-            .join(' / ');
 
           // Calculate risk/reward ratio
           const riskRewardRatio = strategy.maxLoss > 0
@@ -127,11 +122,27 @@ export function SavedStrategies({
                 </Text>
               </Box>
 
-              {/* Strikes */}
-              <Box width={20}>
-                <Text color={textColor} backgroundColor={bgColor}>
-                  {strikes}
-                </Text>
+              {/* Legs with color coding (BUY=green, SELL=red) */}
+              <Box width={30}>
+                {strategy.legs.map((leg, legIndex) => {
+                  const action = getLegAction(strategy.type, legIndex);
+                  const actionColor = isHighlighted
+                    ? textColor
+                    : action === 'buy'
+                    ? 'green'
+                    : 'red';
+                  const actionText = action.toUpperCase();
+                  const strikeText = `$${safeToFixed(leg.strikePrice, 2)}`;
+
+                  return (
+                    <Box key={legIndex} marginRight={legIndex < strategy.legs.length - 1 ? 1 : 0}>
+                      <Text color={actionColor} backgroundColor={bgColor}>
+                        {actionText} {strikeText}
+                        {legIndex < strategy.legs.length - 1 ? ' |' : ''}
+                      </Text>
+                    </Box>
+                  );
+                })}
               </Box>
 
               {/* Max Loss */}
