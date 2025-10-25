@@ -1,6 +1,6 @@
 // AIDEV-NOTE: Unit tests for fetch utilities
 import { describe, it, expect } from 'vitest';
-import { parseOptionSymbol } from './fetch.js';
+import { parseOptionSymbol } from '../src/utils/fetch.js';
 
 describe('parseOptionSymbol', () => {
   it('should parse valid call option symbol', () => {

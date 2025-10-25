@@ -1,6 +1,6 @@
 // AIDEV-NOTE: Test helper utilities for creating mock data
 
-import type { OptionContract, OptionStrategy } from '../types/index.js';
+import type { OptionContract, OptionStrategy } from '../../src/types/index.js';
 
 /**
  * Create a mock OptionContract for testing

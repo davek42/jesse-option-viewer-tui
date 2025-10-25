@@ -17,14 +17,14 @@ import {
   getStrategyDescription,
   formatCurrency,
   formatPercentage,
-} from './strategies.js';
+} from '../src/utils/strategies.js';
 import {
   createMockOption,
   createBullCallSpreadPair,
   createBearPutSpreadPair,
   createStraddlePair,
   createIronCondorLegs,
-} from '../test-utils/mocks.js';
+} from './test-utils/mocks.js';
 
 describe('calculateBullCallSpread', () => {
   describe('Valid spreads', () => {
