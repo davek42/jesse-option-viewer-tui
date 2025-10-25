@@ -639,6 +639,10 @@ export function StrategyBuilder({
               <Text dimColor> Jump to leg</Text>
             </Box>
             <Box marginRight={2}>
+              <Text color="cyan">x/d</Text>
+              <Text dimColor> Undo leg</Text>
+            </Box>
+            <Box marginRight={2}>
               <Text color="cyan">q/Esc</Text>
               <Text dimColor> Cancel</Text>
             </Box>

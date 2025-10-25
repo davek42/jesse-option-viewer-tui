@@ -182,4 +182,5 @@ export type AppAction =
   | { type: 'SET_LONG_CALL'; payload: OptionContract | null }
   | { type: 'SET_SHORT_CALL'; payload: OptionContract | null }
   | { type: 'ADD_LEG'; payload: OptionContract }
+  | { type: 'REMOVE_LAST_LEG' }
   | { type: 'CLEAR_LEGS' };

@@ -10,6 +10,7 @@ import { SymbolDetailScreen } from './screens/SymbolDetailScreen.js';
 import { OptionChainViewScreen } from './screens/OptionChainViewScreen.js';
 import { SavedStrategiesScreen } from './screens/SavedStrategiesScreen.js';
 import { OptionChainScreen } from './screens/OptionChainScreen.js';
+import { HelpScreen } from './screens/HelpScreen.js';
 import { TerminalSizeWarning } from './components/TerminalSizeWarning.js';
 import { StrategySelector } from './components/StrategySelector.js';
 import { getATMIndex } from './components/OptionChain.js';
@@ -90,6 +91,37 @@ function shouldCenterOnATM(strategyType: StrategyType, step: string): boolean {
     default:
       return false;
   }
+}
+
+/**
+ * Get the previous step when undoing a leg selection
+ */
+function getPreviousStep(
+  strategyType: StrategyType,
+  currentStep: string,
+  selectedLegsCount: number
+): string | null {
+  // If no legs selected yet, can't go back
+  if (selectedLegsCount === 0) {
+    return null;
+  }
+
+  // For bull_call_spread (uses 'long'/'short' instead of leg1/leg2)
+  if (strategyType === 'bull_call_spread') {
+    if (currentStep === 'short') return 'long';
+    return null; // Can't go back from 'long'
+  }
+
+  // For other strategies using leg1, leg2, leg3, leg4
+  const legMatch = currentStep.match(/leg(\d+)/);
+  if (legMatch && legMatch[1]) {
+    const currentLegNum = parseInt(legMatch[1], 10);
+    if (currentLegNum > 1) {
+      return `leg${currentLegNum - 1}`;
+    }
+  }
+
+  return null; // Can't go back from leg1
 }
 
 /**
@@ -629,6 +661,29 @@ function GlobalInputHandler() {
           setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
         }
 
+        // Undo last leg selection with 'x' or 'd'
+        else if (input === 'x' || input === 'd') {
+          const previousStep = getPreviousStep(state.selectedStrategyType!, state.builderStep, state.selectedLegs.length);
+
+          if (previousStep) {
+            // Remove the last leg
+            dispatch({ type: 'REMOVE_LAST_LEG' });
+
+            // Also clear longCall/shortCall if using bull_call_spread
+            if (state.selectedStrategyType === 'bull_call_spread' && state.builderStep === 'short') {
+              dispatch({ type: 'SET_SHORT_CALL', payload: null });
+            }
+
+            // Go back to previous step
+            dispatch({ type: 'SET_BUILDER_STEP', payload: previousStep as 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4' });
+            setHighlightedIndex(0);
+            dispatch({ type: 'SET_STATUS', payload: { message: `Undid leg selection, back to ${previousStep}`, type: 'info' } });
+            logger.info(`🔙 Undid leg selection, back to ${previousStep}`);
+          } else {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'No leg to undo', type: 'warning' } });
+          }
+        }
+
         // Select option or save strategy
         else if (key.return) {
           // Check if strategy is complete and ready to save
@@ -942,6 +997,14 @@ function GlobalInputHandler() {
       }
     }
 
+    // Help screen navigation
+    if (currentScreen === 'help') {
+      // Go back
+      if (input === 'q') {
+        dispatch({ type: 'GO_BACK' });
+      }
+    }
+
     // Legacy optionChain screen navigation (kept for backward compatibility if needed)
     // This is now handled by symbolDetail + strategy builder modal
     /*
@@ -1241,6 +1304,9 @@ function AppContent() {
           />
         )}
 
+        {/* Help Screen */}
+        {state.currentScreen === 'help' && <HelpScreen />}
+
       </Box>
 
       {/* Keyboard shortcuts help - Context-aware */}
@@ -1291,6 +1357,13 @@ function AppContent() {
               <>
                 <Text bold color="cyan">↑↓/j/k</Text> Navigate{' '}
                 <Text bold color="cyan">x</Text> Delete{' '}
+                <Text bold color="cyan">q</Text> Back
+              </>
+            )}
+
+            {/* Help screen */}
+            {state.currentScreen === 'help' && (
+              <>
                 <Text bold color="cyan">q</Text> Back
               </>
             )}

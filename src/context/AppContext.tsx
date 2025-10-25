@@ -280,6 +280,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedLegs: [...state.selectedLegs, action.payload],
       };
 
+    case 'REMOVE_LAST_LEG':
+      return {
+        ...state,
+        selectedLegs: state.selectedLegs.slice(0, -1),
+      };
+
     case 'CLEAR_LEGS':
       return {
         ...state,
