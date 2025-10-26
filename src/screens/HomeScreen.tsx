@@ -16,7 +16,7 @@ export function HomeScreen() {
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">
-          🏠 Welcome to Option Chain Viewer
+          🏠 Welcome to Jesse Option Chain Viewer
         </Text>
       </Box>
 
@@ -60,7 +60,7 @@ export function HomeScreen() {
 
       {/* Version footer */}
       <Box marginTop={2}>
-        <Text dimColor>v{VERSION}</Text>
+        <Text dimColor>Jesse Option Viewer TUI v{VERSION}</Text>
       </Box>
     </Box>
   );
