@@ -254,6 +254,8 @@ MIT
 
 See `CLAUDE.md` for development guidelines and conventions.
 
+---
+
 ## Screenshots
 
 ### Symbol Entry Screen

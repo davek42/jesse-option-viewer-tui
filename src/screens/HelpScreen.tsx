@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import { VERSION } from '../version.js';
 
 /**
  * HelpScreen Component
@@ -295,10 +296,13 @@ export function HelpScreen() {
       </Box>
 
       {/* Footer */}
-      <Box paddingX={1} marginTop={1}>
+      <Box paddingX={1} marginTop={1} flexDirection="column">
         <Text dimColor>
           Press <Text bold color="cyan">q</Text> to go back
         </Text>
+        <Box marginTop={1}>
+          <Text dimColor>Jesse Option Viewer TUI v{VERSION}</Text>
+        </Box>
       </Box>
     </Box>
   );

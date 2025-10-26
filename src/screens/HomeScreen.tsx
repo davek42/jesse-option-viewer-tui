@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { useAppContext } from '../context/AppContext.js';
 import { safeToFixed } from '../utils/formatters.js';
+import { VERSION } from '../version.js';
 
 /**
  * HomeScreen component
@@ -56,6 +57,11 @@ export function HomeScreen() {
           </Text>
         </Box>
       )}
+
+      {/* Version footer */}
+      <Box marginTop={2}>
+        <Text dimColor>v{VERSION}</Text>
+      </Box>
     </Box>
   );
 }
