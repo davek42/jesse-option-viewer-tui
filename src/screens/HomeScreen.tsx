@@ -16,7 +16,7 @@ export function HomeScreen() {
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">
-          🏠 Welcome to Jesse Option Chain Viewer
+          🏠 Welcome to Jesse Option Viewer
         </Text>
       </Box>
 

@@ -17,7 +17,7 @@ export function Header({ compact = false }: HeaderProps) {
     return (
       <Box borderStyle="double" paddingX={1} justifyContent="center">
         <Gradient name="rainbow">
-          <Text bold>📊 OPTION CHAIN VIEWER 📊</Text>
+          <Text bold>📊 JESSE OPTION VIEWER 📊</Text>
         </Gradient>
       </Box>
     );
