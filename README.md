@@ -253,3 +253,14 @@ MIT
 ## Contributing
 
 See `CLAUDE.md` for development guidelines and conventions.
+
+## Screenshots
+
+### Symbol Entry Screen
+![Symbol Entry Screen](doc/images/SymbolScreen.jpg)
+
+### Option Chain View
+![Option Chain View](doc/images/OptionChainViewScreen.jpg)
+
+### Strategy Builder
+![Strategy Builder](doc/images/StrategyBuilderChooseScreen.jpg)
