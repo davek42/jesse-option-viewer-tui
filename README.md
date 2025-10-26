@@ -1,14 +1,22 @@
-# Option Chain Viewer TUI
+# Jesse Option Viewer TUI
 
-A terminal-based user interface (TUI) application for viewing option chains using the Alpaca Markets API.
+A terminal-based user interface (TUI) application for viewing option chains and building option strategies using the Alpaca Markets API.
 
 ## Features
 
-- 📊 View real-time stock quotes
-- 📈 Display option chains with Greeks (delta, gamma, theta, vega)
-- 💾 Save and manage option strategies
-- ⌨️ Keyboard-driven navigation
+- 📊 View real-time stock quotes with price changes
+- 📈 Display option chains with Greeks (delta, gamma, theta, vega, rho)
+- 🏗️ Build option strategies with interactive wizard
+  - Bull Call Spread
+  - Bear Put Spread
+  - Diagonal Call Spread (dual-expiration support)
+  - Iron Condor
+  - Long Straddle
+  - Covered Call
+- 💾 Save and manage option strategies with persistence
+- ⌨️ Keyboard-driven navigation with vim-style shortcuts
 - 🎨 Beautiful terminal UI with Ink and React
+- 🧪 Comprehensive test suite (101 tests)
 
 ## Prerequisites
 
@@ -43,7 +51,60 @@ Get your API keys from [Alpaca Markets Dashboard](https://app.alpaca.markets/pap
 
 ### 3. Run the Application
 
-**Development mode** (with hot reload):
+See the [Usage](#usage) section below for instructions on running the app.
+
+## Project Structure
+
+```
+jesse-option-viewer-tui/
+├── src/
+│   ├── components/          # React/Ink UI components
+│   │   ├── ExpirationSelect.tsx   # Expiration date selector
+│   │   ├── Header.tsx             # App header
+│   │   ├── OptionChain.tsx        # Option chain table display
+│   │   ├── SavedStrategies.tsx    # Saved strategies list
+│   │   ├── StatusBar.tsx          # Status bar with mode indicator
+│   │   ├── StrategyBuilder.tsx    # Interactive strategy wizard
+│   │   └── StrategySelector.tsx   # Strategy type selection
+│   ├── screens/             # Screen components
+│   │   ├── HelpScreen.tsx         # Help/keyboard shortcuts
+│   │   ├── HomeScreen.tsx         # Welcome screen
+│   │   └── OptionChainScreen.tsx  # Main option chain view
+│   ├── context/             # React Context state management
+│   │   └── AppContext.tsx         # Global state + reducer
+│   ├── lib/                 # API wrappers and integrations
+│   │   └── alpaca.ts              # Alpaca API client
+│   ├── utils/               # Utility functions
+│   │   ├── fetch.ts               # Rate-limited fetch + parsing
+│   │   ├── formatters.ts          # Number/currency formatting
+│   │   ├── logger.ts              # Emoji-enhanced logging
+│   │   ├── storage.ts             # JSON file persistence
+│   │   └── strategies.ts          # Strategy calculations
+│   ├── types/               # TypeScript type definitions
+│   │   └── index.ts
+│   ├── App.tsx              # Main app + global input handler
+│   └── index.tsx            # Entry point
+├── tests/                   # Test suite (Vitest)
+│   ├── fetch.test.ts              # API parsing tests
+│   ├── strategies.test.ts         # Strategy calculation tests
+│   └── test-utils/
+│       └── mocks.ts               # Test mock factories
+├── doc/                     # Documentation
+│   └── global-input-handler-guidelines.md
+├── logs/                    # Application logs (gitignored)
+├── .env                     # API credentials (gitignored)
+├── .env.example             # Example environment config
+├── package.json
+├── tsconfig.json
+├── vitest.config.ts
+└── README.md
+```
+
+## Usage
+
+### Running the Application
+
+**Development mode** (recommended for testing):
 ```bash
 npm run dev
 ```
@@ -54,50 +115,44 @@ npm run build
 npm start
 ```
 
-## Project Structure
+### Quick Start
 
-```
-option-viewer-tui/
-├── src/
-│   ├── components/     # React/Ink UI components
-│   │   ├── Header.tsx
-│   │   └── StatusBar.tsx
-│   ├── screens/        # Screen components
-│   │   └── HomeScreen.tsx
-│   ├── context/        # React Context state management
-│   │   └── AppContext.tsx
-│   ├── lib/           # API wrappers and integrations
-│   │   └── alpaca.ts  # Alpaca API wrapper
-│   ├── utils/         # Utility functions
-│   │   ├── logger.ts  # Emoji-enhanced logging
-│   │   └── storage.ts # JSON file persistence
-│   ├── types/         # TypeScript type definitions
-│   │   └── index.ts
-│   ├── App.tsx        # Main application component
-│   └── index.tsx      # Entry point
-├── doc/               # Documentation
-├── package.json
-├── tsconfig.json
-└── README.md
-```
+1. Run `npm run dev`
+2. Press `s` to enter a stock symbol (e.g., "AAPL")
+3. Navigate through expiration dates and view option chain
+4. Press `b` to open strategy builder
+5. Select a strategy type and follow the wizard
 
 ## Keyboard Shortcuts
 
-### Navigation Mode (Default)
+### Home Screen
 - `s` - Enter stock symbol
 - `h` or `?` - Show help
 - `q` - Quit application
-- `/` - Enter command mode
 - `Ctrl+C` - Exit
 
-### Input Mode
-- Type symbol and press `Enter` to submit
-- `ESC` - Cancel input
+### Option Chain Screen
+- `↑/↓` or `j/k` - Navigate up/down (vim-style)
+- `e` - Focus expiration selector
+- `o` - Focus option chain
+- `l` - Toggle display limit (10/20/40/ALL)
+- `g` - Toggle Greeks display
+- `b` - Open strategy builder
+- `s` - Change symbol
+- `q` - Go back to home
 
-### Command Mode
-- Type `/` followed by command
-- `Enter` - Execute command
-- `ESC` - Cancel
+### Strategy Builder
+- `↑/↓` or `j/k` - Navigate options
+- `Enter` - Select option/confirm
+- `ESC` or `q` - Cancel builder
+- `x` or `d` - Undo last leg selection
+- `1/2/3/4` - Jump to specific leg (multi-leg strategies)
+- `y` - Confirm save strategy
+
+### Input Mode
+- Type text and press `Enter` to submit
+- `ESC` - Cancel input
+- `Backspace` - Delete last character
 
 ## Architecture
 
@@ -140,25 +195,37 @@ npm run test:watch
 
 ## Implementation Status
 
-### ✅ Completed (Tasks 1-3)
-- [x] TypeScript project setup
-- [x] Dependencies installed and configured
-- [x] Alpaca API wrapper methods created
-- [x] Basic folder structure
-- [x] Global input handler
-- [x] State management with Context
-- [x] Logging system with emojis
-- [x] JSON file persistence
+### ✅ Completed
+- [x] TypeScript project setup with strict type checking
+- [x] Dependencies installed and configured (React, Ink, Vitest)
+- [x] Alpaca API wrapper with v1beta1 and v2 endpoint support
+- [x] Project folder structure with screens, components, context
+- [x] Global input handler pattern implementation
+- [x] State management with React Context + useReducer
+- [x] Emoji-enhanced logging system with file output
+- [x] JSON file persistence for strategies (~/.option-viewer/)
+- [x] Stock quote display with real-time price changes
+- [x] Option chain display with Greeks
+- [x] Expiration date selection with days-to-expiry calculation
+- [x] Strategy builder wizard with interactive selection
+- [x] 6 option strategies implemented:
+  - Bull Call Spread
+  - Bear Put Spread
+  - Diagonal Call Spread (dual-expiration)
+  - Iron Condor (4-leg)
+  - Long Straddle
+  - Covered Call
+- [x] Strategy metrics calculation (P&L, risk/reward, breakeven)
+- [x] Saved strategies display with remove functionality
+- [x] Comprehensive test suite (101 tests)
+- [x] Type-safe API parsing with defensive validation
 
-### 🚧 In Progress
-- [ ] Option chain display component
-- [ ] Expiration date selection
-- [ ] Option strategy builders
-
-### 📋 Planned
-- [ ] Multiple option strategies (Bull Call, Bear Put, etc.)
-- [ ] Strategy comparison
-- [ ] Real-time price updates
+### 📋 Future Enhancements
+- [ ] Additional strategies (Butterfly, Calendar, etc.)
+- [ ] Strategy comparison view
+- [ ] Real-time price updates with WebSocket
+- [ ] Portfolio tracking
+- [ ] Historical P&L charts
 
 ## Logging
 
