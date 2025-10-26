@@ -2,6 +2,8 @@
 
 A terminal-based user interface (TUI) application for viewing option chains and building option strategies using the Alpaca Markets API.
 
+NOTE: An experiment in vibe coding with Claude Code
+
 ## Features
 
 - 📊 View real-time stock quotes with price changes
