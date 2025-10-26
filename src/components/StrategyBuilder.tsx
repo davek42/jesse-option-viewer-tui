@@ -9,6 +9,7 @@ import {
   calculateLongStraddle,
   calculateIronCondor,
   calculateCoveredCall,
+  calculateDiagonalCallSpread,
   formatCurrency,
   formatPercentage,
   getStrategyDisplayName,
@@ -40,7 +41,7 @@ interface StrategyBuilderProps {
   selectedLegs: OptionContract[];
 
   /** Current selection step (Task #9 - Multi-strategy support) */
-  selectionStep: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4';
+  selectionStep: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4' | 'expiration1' | 'expiration2';
 
   /** Highlighted index for option selection */
   highlightedIndex: number;
@@ -65,6 +66,7 @@ function getLegCount(strategyType: StrategyType): number {
   switch (strategyType) {
     case 'bull_call_spread':
     case 'bear_put_spread':
+    case 'diagonal_call_spread':
       return 2;
     case 'long_straddle':
       return 2;
@@ -87,6 +89,12 @@ function getStepInstruction(strategyType: StrategyType, step: string): JSX.Eleme
         return <><Text bold color="cyan">Step 1:</Text> Select LONG CALL (Buy) - Choose ATM or slightly OTM</>;
       }
       return <><Text bold color="cyan">Step 2:</Text> Select SHORT CALL (Sell) - Choose higher strike</>;
+
+    case 'diagonal_call_spread':
+      if (step === 'leg1') {
+        return <><Text bold color="cyan">Step 1:</Text> Select LONG CALL (Buy) - Lower strike, <Text bold color="yellow">LONGER expiration</Text></>;
+      }
+      return <><Text bold color="cyan">Step 2:</Text> Select SHORT CALL (Sell) - Higher strike, <Text bold color="yellow">SHORTER expiration</Text></>;
 
     case 'bear_put_spread':
       if (step === 'leg1') {
@@ -142,6 +150,14 @@ export function StrategyBuilder({
           ? calculateBullCallSpread(longCall, shortCall, quantity)
           : null;
 
+      case 'diagonal_call_spread':
+        // For diagonal call spread: buy lower strike (longer exp), sell higher strike (shorter exp)
+        const diagonalLongCall = selectedLegs[0];
+        const diagonalShortCall = selectedLegs[1];
+        return diagonalLongCall && diagonalShortCall
+          ? calculateDiagonalCallSpread(diagonalLongCall, diagonalShortCall, quantity)
+          : null;
+
       case 'bear_put_spread':
         // For bear put spread: buy higher strike put, sell lower strike put
         const longPut = selectedLegs[0];
@@ -186,6 +202,19 @@ export function StrategyBuilder({
         ? calls
         : calls.filter(call => longCall ? call.strikePrice > longCall.strikePrice : true);
       return { availableOptions: availableCalls, optionType: 'call' as const };
+    }
+
+    // For diagonal_call_spread
+    if (strategyType === 'diagonal_call_spread') {
+      if (selectionStep === 'leg1') {
+        // leg1: long call (lower strike, longer expiration) - show all calls
+        return { availableOptions: calls, optionType: 'call' as const };
+      }
+      // leg2: short call (higher strike, shorter expiration)
+      // Filter for higher strikes than leg1
+      const longCall = selectedLegs[0];
+      const filtered = longCall ? calls.filter(c => c.strikePrice > longCall.strikePrice) : calls;
+      return { availableOptions: filtered, optionType: 'call' as const };
     }
 
     // For bear_put_spread
@@ -337,6 +366,10 @@ export function StrategyBuilder({
                   <Text color={leg.optionType === 'call' ? 'green' : 'magenta'}>
                     ✓ {leg.optionType.toUpperCase()} ${safeToFixed(leg.strikePrice, 2)}
                   </Text>
+                  {/* Show expiration date for diagonal spreads */}
+                  {strategyType === 'diagonal_call_spread' && (
+                    <Text dimColor> (exp: {leg.expirationDate})</Text>
+                  )}
                 </Box>
               </Box>
             ))}
@@ -609,6 +642,14 @@ export function StrategyBuilder({
                   <Text bold>Return if Called:</Text>
                 </Box>
                 <Text color="cyan">{formatPercentage(metrics.returnIfCalled)}</Text>
+              </Box>
+            )}
+            {'timeSpread' in metrics && typeof metrics.timeSpread === 'number' && (
+              <Box>
+                <Box width={20}>
+                  <Text bold color="yellow">Time Spread:</Text>
+                </Box>
+                <Text color="yellow">{metrics.timeSpread} days</Text>
               </Box>
             )}
           </Box>

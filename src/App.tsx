@@ -23,7 +23,8 @@ import {
   createBearPutSpread,
   createLongStraddle,
   createIronCondor,
-  createCoveredCall
+  createCoveredCall,
+  createDiagonalCallSpread
 } from './utils/strategies.js';
 import type { StrategyType, OptionContract, OptionStrategy, AppAction } from './types/index.js';
 
@@ -80,6 +81,8 @@ function shouldCenterOnATM(strategyType: StrategyType, step: string): boolean {
   switch (strategyType) {
     case 'bull_call_spread':
       return step === 'long'; // leg1 shows all calls
+    case 'diagonal_call_spread':
+      return step === 'leg1'; // leg1 shows all calls
     case 'bear_put_spread':
       return step === 'leg1'; // leg1 shows all puts
     case 'long_straddle':
@@ -126,6 +129,8 @@ function getPreviousStep(
 
 /**
  * Get available options for the current step based on strategy type
+ *
+ * For diagonal spreads, this function needs access to state to get leg-specific option chains
  */
 function getAvailableOptionsForStep(
   strategyType: StrategyType,
@@ -133,7 +138,9 @@ function getAvailableOptionsForStep(
   calls: OptionContract[],
   puts: OptionContract[],
   selectedLongCall: OptionContract | null,
-  selectedLegs: OptionContract[]
+  selectedLegs: OptionContract[],
+  leg1OptionChain?: { calls: OptionContract[]; puts: OptionContract[] } | null,
+  leg2OptionChain?: { calls: OptionContract[]; puts: OptionContract[] } | null
 ): OptionContract[] {
   switch (strategyType) {
     case 'bull_call_spread':
@@ -141,6 +148,21 @@ function getAvailableOptionsForStep(
       return step === 'long'
         ? calls
         : calls.filter(c => selectedLongCall ? c.strikePrice > selectedLongCall.strikePrice : true);
+
+    case 'diagonal_call_spread':
+      // Use leg-specific option chains for diagonal spreads
+      if (step === 'leg1') {
+        // Leg 1: Use leg1OptionChain (longer expiration)
+        return leg1OptionChain?.calls || [];
+      } else if (step === 'leg2') {
+        // Leg 2: Use leg2OptionChain (shorter expiration), filter for higher strikes
+        const leg2Calls = leg2OptionChain?.calls || [];
+        const leg1 = selectedLegs[0];
+        return leg1
+          ? leg2Calls.filter((c: OptionContract) => c.strikePrice > leg1.strikePrice)
+          : leg2Calls;
+      }
+      return [];
 
     case 'bear_put_spread':
       // Step 1 (leg1): All puts | Step 2 (leg2): Lower strike puts
@@ -201,6 +223,9 @@ function isStrategyComplete(
     case 'bull_call_spread':
       return selectedLongCall !== null && selectedShortCall !== null;
 
+    case 'diagonal_call_spread':
+      return selectedLegs.length === 2;
+
     case 'bear_put_spread':
       return selectedLegs.length === 2;
 
@@ -234,6 +259,13 @@ function createStrategyByType(
       return selectedLongCall && selectedShortCall
         ? createBullCallSpread(symbol, selectedLongCall, selectedShortCall, 1)
         : null;
+
+    case 'diagonal_call_spread': {
+      const [longCall, shortCall] = selectedLegs;
+      return longCall && shortCall
+        ? createDiagonalCallSpread(symbol, longCall, shortCall, 1)
+        : null;
+    }
 
     case 'bear_put_spread': {
       const [longPut, shortPut] = selectedLegs;
@@ -278,6 +310,9 @@ function getInitialStrategyMessage(strategyType: StrategyType): string {
   switch (strategyType) {
     case 'bull_call_spread':
       return 'Select LONG CALL (Buy) - Choose ATM or slightly OTM strike';
+
+    case 'diagonal_call_spread':
+      return 'Step 1: Select LONGER expiration for leg 1 (long call)';
 
     case 'bear_put_spread':
       return 'Select LONG PUT (Buy) - Choose higher strike put';
@@ -354,6 +389,14 @@ function handleOptionSelection(
   optionChain?: { calls: OptionContract[]; puts: OptionContract[]; underlyingPrice: number } | null,
   displayLimit?: number
 ): void {
+  // Defensive validation - ensure selectedOption is a valid OptionContract
+  if (!selectedOption || typeof selectedOption.strikePrice !== 'number') {
+    logger.error(`❌ Invalid OptionContract in handleOptionSelection: ${JSON.stringify(selectedOption)}`);
+    logger.error(`   strategyType=${strategyType}, step=${step}`);
+    dispatch({ type: 'SET_STATUS', payload: { message: 'Error: Invalid option contract', type: 'error' } });
+    return;
+  }
+
   // Bull Call Spread uses legacy longCall/shortCall state
   if (strategyType === 'bull_call_spread') {
     if (step === 'long') {
@@ -370,6 +413,21 @@ function handleOptionSelection(
 
   // All other strategies use selectedLegs array
   dispatch({ type: 'ADD_LEG', payload: selectedOption });
+
+  // Special handling for diagonal spreads
+  if (strategyType === 'diagonal_call_spread') {
+    if (step === 'leg1') {
+      // After selecting leg 1, go to expiration selection for leg 2
+      dispatch({ type: 'SET_BUILDER_STEP', payload: 'expiration2' });
+      setHighlightedIndex(0);
+      dispatch({ type: 'SET_STATUS', payload: { message: `✓ Leg 1 (Long Call) at $${selectedOption.strikePrice.toFixed(2)} selected. Now select SHORTER expiration for leg 2`, type: 'success' } });
+      return;
+    } else if (step === 'leg2') {
+      // Leg 2 selected, strategy is complete
+      dispatch({ type: 'SET_STATUS', payload: { message: `✓ Leg 2 (Short Call) at $${selectedOption.strikePrice.toFixed(2)} selected. Press Enter to SAVE strategy`, type: 'success' } });
+      return;
+    }
+  }
 
   // Determine next step
   const legNumber = parseInt(step.replace('leg', ''));
@@ -395,11 +453,60 @@ function handleOptionSelection(
 }
 
 /**
+ * Handle expiration selection for diagonal spreads
+ * Loads option chain for the selected expiration and transitions to next step
+ */
+async function handleExpirationSelectionForDiagonal(
+  selectedExpiration: string,
+  currentStep: 'expiration1' | 'expiration2',
+  currentSymbol: string,
+  dispatch: React.Dispatch<AppAction>,
+  setHighlightedIndex: (index: number) => void
+): Promise<void> {
+
+  try {
+    dispatch({ type: 'SET_LOADING', payload: true });
+
+    // Fetch option chain for the selected expiration
+    const client = getAlpacaClient();
+    const chain = await client.getOptionChain(currentSymbol, selectedExpiration);
+
+    if (chain) {
+      if (currentStep === 'expiration1') {
+        // Save leg 1 expiration and option chain
+        dispatch({ type: 'SET_LEG1_EXPIRATION', payload: selectedExpiration });
+        dispatch({ type: 'SET_LEG1_OPTION_CHAIN', payload: chain });
+        dispatch({ type: 'SET_BUILDER_STEP', payload: 'leg1' });
+        dispatch({ type: 'SET_STATUS', payload: { message: `✓ Leg 1 expiration: ${selectedExpiration}. Select LONG CALL (lower strike)`, type: 'success' } });
+        logger.info(`📅 Leg 1 expiration selected: ${selectedExpiration}`);
+      } else {
+        // Save leg 2 expiration and option chain
+        dispatch({ type: 'SET_LEG2_EXPIRATION', payload: selectedExpiration });
+        dispatch({ type: 'SET_LEG2_OPTION_CHAIN', payload: chain });
+        dispatch({ type: 'SET_BUILDER_STEP', payload: 'leg2' });
+        dispatch({ type: 'SET_STATUS', payload: { message: `✓ Leg 2 expiration: ${selectedExpiration}. Select SHORT CALL (higher strike)`, type: 'success' } });
+        logger.info(`📅 Leg 2 expiration selected: ${selectedExpiration}`);
+      }
+
+      setHighlightedIndex(0);
+    } else {
+      dispatch({ type: 'SET_STATUS', payload: { message: 'Failed to load option chain', type: 'error' } });
+    }
+  } catch (error) {
+    logger.error('Error loading option chain for diagonal spread:', error);
+    dispatch({ type: 'SET_STATUS', payload: { message: 'Error loading option chain', type: 'error' } });
+  } finally {
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }
+}
+
+/**
  * Get total number of legs for a strategy type
  */
 function getLegCountForStrategy(strategyType: StrategyType): number {
   switch (strategyType) {
     case 'bull_call_spread':
+    case 'diagonal_call_spread':
     case 'bear_put_spread':
     case 'long_straddle':
       return 2;
@@ -607,23 +714,29 @@ function GlobalInputHandler() {
           if (key.upArrow || input === 'k') {
             setHighlightedIndex((prev) => Math.max(0, prev - 1));
           } else if (key.downArrow || input === 'j') {
-            // 5 available strategies
-            setHighlightedIndex((prev) => Math.min(4, prev + 1));
+            // 6 available strategies
+            setHighlightedIndex((prev) => Math.min(5, prev + 1));
           }
           // Select strategy type
           else if (key.return) {
-            const strategies: StrategyType[] = ['bull_call_spread', 'bear_put_spread', 'iron_condor', 'long_straddle', 'covered_call'];
+            const strategies: StrategyType[] = ['bull_call_spread', 'bear_put_spread', 'diagonal_call_spread', 'iron_condor', 'long_straddle', 'covered_call'];
             const selectedType = strategies[highlightedIndex];
             if (selectedType) {
               dispatch({ type: 'SET_STRATEGY_TYPE', payload: selectedType });
 
-              // Center on ATM for leg1 if showing all options
-              const firstStep = selectedType === 'bull_call_spread' ? 'long' : 'leg1';
-              if (shouldCenterOnATM(selectedType, firstStep) && optionChain) {
-                const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
-                setHighlightedIndex(atmIndex);
-              } else {
+              // Set initial highlighted index
+              if (selectedType === 'diagonal_call_spread') {
+                // For diagonal spreads, start at first expiration
                 setHighlightedIndex(0);
+              } else {
+                // Center on ATM for leg1 if showing all options
+                const firstStep = selectedType === 'bull_call_spread' ? 'long' : 'leg1';
+                if (shouldCenterOnATM(selectedType, firstStep) && optionChain) {
+                  const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
+                  setHighlightedIndex(atmIndex);
+                } else {
+                  setHighlightedIndex(0);
+                }
               }
 
               logger.info(`📋 Selected strategy type: ${selectedType}`);
@@ -648,37 +761,45 @@ function GlobalInputHandler() {
         if (key.upArrow || input === 'k') {
           setHighlightedIndex((prev) => Math.max(0, prev - 1));
         } else if (key.downArrow || input === 'j') {
-          // Get available options based on strategy type and step
-          const availableOptions = getAvailableOptionsForStep(
-            state.selectedStrategyType!,
-            state.builderStep,
-            optionChain?.calls || [],
-            optionChain?.puts || [],
-            state.selectedLongCall,
-            state.selectedLegs
-          );
-          const maxIndex = availableOptions.length - 1; // Allow scrolling through all options
+          // For expiration selection, use availableExpirations instead of options
+          let maxIndex: number;
+          if (state.builderStep === 'expiration1' || state.builderStep === 'expiration2') {
+            maxIndex = availableExpirations.length - 1;
+          } else {
+            // Get available options based on strategy type and step
+            const availableOptions = getAvailableOptionsForStep(
+              state.selectedStrategyType!,
+              state.builderStep,
+              optionChain?.calls || [],
+              optionChain?.puts || [],
+              state.selectedLongCall,
+              state.selectedLegs,
+              state.leg1OptionChain,
+              state.leg2OptionChain
+            );
+            maxIndex = availableOptions.length - 1; // Allow scrolling through all options
 
-          // Debug logging for Iron Condor filtering issues
-          if (state.selectedStrategyType === 'iron_condor' && (state.builderStep === 'leg2' || state.builderStep === 'leg4')) {
-            const totalCalls = optionChain?.calls.length || 0;
-            const totalPuts = optionChain?.puts.length || 0;
-            const optionType = state.builderStep === 'leg2' ? 'puts' : 'calls';
-            const totalOptions = state.builderStep === 'leg2' ? totalPuts : totalCalls;
-            logger.debug(`Iron Condor ${state.builderStep}: ${availableOptions.length} options available (${totalOptions} total ${optionType}), maxIndex=${maxIndex}, currentIndex=${highlightedIndex}`);
-            if (availableOptions.length > 0) {
-              logger.debug(`First strike: ${availableOptions[0]?.strikePrice}, Last strike: ${availableOptions[availableOptions.length - 1]?.strikePrice}`);
-            }
-            // Show what was selected in previous legs
-            if (state.builderStep === 'leg2' && state.selectedLegs[0]) {
-              logger.debug(`Leg 1 (buy put) was: ${state.selectedLegs[0].strikePrice}, filtering for puts > ${state.selectedLegs[0].strikePrice}`);
-            }
-            if (state.builderStep === 'leg4' && state.selectedLegs[2]) {
-              logger.debug(`Leg 3 (short call) was: ${state.selectedLegs[2].strikePrice}, filtering for calls > ${state.selectedLegs[2].strikePrice}`);
-              // Also show what the total call range is
-              if (optionChain?.calls && optionChain.calls.length > 0) {
-                const allCallStrikes = optionChain.calls.map(c => c.strikePrice).sort((a, b) => a - b);
-                logger.debug(`All available call strikes range: ${allCallStrikes[0]} to ${allCallStrikes[allCallStrikes.length - 1]}`);
+            // Debug logging for Iron Condor filtering issues
+            if (state.selectedStrategyType === 'iron_condor' && (state.builderStep === 'leg2' || state.builderStep === 'leg4')) {
+              const totalCalls = optionChain?.calls.length || 0;
+              const totalPuts = optionChain?.puts.length || 0;
+              const optionType = state.builderStep === 'leg2' ? 'puts' : 'calls';
+              const totalOptions = state.builderStep === 'leg2' ? totalPuts : totalCalls;
+              logger.debug(`Iron Condor ${state.builderStep}: ${availableOptions.length} options available (${totalOptions} total ${optionType}), maxIndex=${maxIndex}, currentIndex=${highlightedIndex}`);
+              if (availableOptions.length > 0) {
+                logger.debug(`First strike: ${availableOptions[0]?.strikePrice}, Last strike: ${availableOptions[availableOptions.length - 1]?.strikePrice}`);
+              }
+              // Show what was selected in previous legs
+              if (state.builderStep === 'leg2' && state.selectedLegs[0]) {
+                logger.debug(`Leg 1 (buy put) was: ${state.selectedLegs[0].strikePrice}, filtering for puts > ${state.selectedLegs[0].strikePrice}`);
+              }
+              if (state.builderStep === 'leg4' && state.selectedLegs[2]) {
+                logger.debug(`Leg 3 (short call) was: ${state.selectedLegs[2].strikePrice}, filtering for calls > ${state.selectedLegs[2].strikePrice}`);
+                // Also show what the total call range is
+                if (optionChain?.calls && optionChain.calls.length > 0) {
+                  const allCallStrikes = optionChain.calls.map(c => c.strikePrice).sort((a, b) => a - b);
+                  logger.debug(`All available call strikes range: ${allCallStrikes[0]} to ${allCallStrikes[allCallStrikes.length - 1]}`);
+                }
               }
             }
           }
@@ -711,6 +832,19 @@ function GlobalInputHandler() {
 
         // Select option or save strategy
         else if (key.return) {
+          // Handle expiration selection for diagonal spreads
+          if (state.builderStep === 'expiration1' || state.builderStep === 'expiration2') {
+            const selectedExpiration = availableExpirations[highlightedIndex];
+            logger.debug(`📅 Expiration selection: step=${state.builderStep}, selectedExpiration=${selectedExpiration}, highlightedIndex=${highlightedIndex}`);
+            if (selectedExpiration && currentSymbol) {
+              // Load option chain for the selected expiration
+              handleExpirationSelectionForDiagonal(selectedExpiration, state.builderStep, currentSymbol, dispatch, setHighlightedIndex);
+            } else {
+              logger.warning(`❌ Cannot select expiration: selectedExpiration=${selectedExpiration}, currentSymbol=${currentSymbol}`);
+            }
+            return;
+          }
+
           // Check if strategy is complete and ready to save
           const isComplete = isStrategyComplete(state.selectedStrategyType!, state.selectedLongCall, state.selectedShortCall, state.selectedLegs);
 
@@ -742,11 +876,22 @@ function GlobalInputHandler() {
               optionChain?.calls || [],
               optionChain?.puts || [],
               state.selectedLongCall,
-              state.selectedLegs
+              state.selectedLegs,
+              state.leg1OptionChain,
+              state.leg2OptionChain
             );
             const selectedOption = availableOptions[highlightedIndex];
 
+            logger.debug(`🎯 Option selection: step=${state.builderStep}, highlightedIndex=${highlightedIndex}, availableOptions=${availableOptions.length}, selectedOption=${selectedOption ? 'valid' : 'undefined'}`);
+
             if (selectedOption) {
+              // Validate that selectedOption is an OptionContract
+              if (!selectedOption.strikePrice || typeof selectedOption.strikePrice !== 'number') {
+                logger.error(`❌ Invalid selectedOption: ${JSON.stringify(selectedOption)}`);
+                dispatch({ type: 'SET_STATUS', payload: { message: 'Error: Invalid option selected', type: 'error' } });
+                return;
+              }
+
               // Handle selection based on strategy type
               handleOptionSelection(
                 state.selectedStrategyType!,
@@ -769,6 +914,18 @@ function GlobalInputHandler() {
 
           // Only allow jumping to valid legs for this strategy
           if (legNum <= totalLegs) {
+            // For diagonal spreads, prevent jumping to legs before expiration is selected
+            if (state.selectedStrategyType === 'diagonal_call_spread') {
+              if (legName === 'leg1' && !state.leg1OptionChain) {
+                dispatch({ type: 'SET_STATUS', payload: { message: 'Please select expiration for leg 1 first', type: 'warning' } });
+                return;
+              }
+              if (legName === 'leg2' && !state.leg2OptionChain) {
+                dispatch({ type: 'SET_STATUS', payload: { message: 'Please select expiration for leg 2 first', type: 'warning' } });
+                return;
+              }
+            }
+
             dispatch({ type: 'SET_BUILDER_STEP', payload: legName });
 
             // Center on ATM if this leg shows all options

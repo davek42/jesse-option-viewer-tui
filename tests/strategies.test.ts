@@ -7,11 +7,13 @@ import {
   calculateLongStraddle,
   calculateIronCondor,
   calculateCoveredCall,
+  calculateDiagonalCallSpread,
   createBullCallSpread,
   createBearPutSpread,
   createLongStraddle,
   createIronCondor,
   createCoveredCall,
+  createDiagonalCallSpread,
   getLegAction,
   getStrategyDisplayName,
   getStrategyDescription,
@@ -24,6 +26,7 @@ import {
   createBearPutSpreadPair,
   createStraddlePair,
   createIronCondorLegs,
+  createDiagonalCallSpreadPair,
 } from './test-utils/mocks.js';
 
 describe('calculateBullCallSpread', () => {
@@ -732,5 +735,234 @@ describe('Helper functions', () => {
       expect(formatPercentage(100)).toBe('100.0%');
       expect(formatPercentage(0.5)).toBe('0.5%');
     });
+  });
+});
+
+describe('calculateDiagonalCallSpread', () => {
+  describe('Valid diagonal spreads', () => {
+    it('should calculate correct net debit', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Net debit = (buy at ask * 100) - (sell at bid * 100)
+      // = (6.0 * 100) - (2.0 * 100) = $400
+      expect(result?.netDebit).toBe(400);
+    });
+
+    it('should calculate correct max loss (equals net debit)', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Max loss = Net debit paid to enter position
+      expect(result?.maxLoss).toBe(400);
+    });
+
+    it('should calculate correct max gain', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Max gain = (Spread width * 100) - Net debit
+      // = ((110 - 100) * 100) - 400 = 1000 - 400 = $600
+      expect(result?.maxGain).toBe(600);
+    });
+
+    it('should calculate correct break-even price', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Break-even = Lower strike + (net debit / 100)
+      // = 100 + (400 / 100) = 104
+      expect(result?.breakEven).toBe(104);
+    });
+
+    it('should calculate correct time spread in days', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(
+        100, 110, 6.0, 2.0,
+        '2025-11-21', // Long expiration
+        '2025-10-24'  // Short expiration
+      );
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Time difference: Nov 21 - Oct 24 = 28 days
+      expect(result?.timeSpread).toBe(28);
+    });
+
+    it('should calculate correct risk/reward ratio', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Risk/Reward = Max gain / Max loss = 600 / 400 = 1.5
+      expect(result?.riskRewardRatio).toBeCloseTo(1.5, 2);
+    });
+
+    it('should calculate correct profit potential percentage', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Profit potential = (Max gain / Max loss) * 100 = (600 / 400) * 100 = 150%
+      expect(result?.profitPotential).toBeCloseTo(150, 2);
+    });
+
+    it('should scale correctly with quantity', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 2);
+
+      // With 2 contracts:
+      // Net debit = ((6.0 * 2) - (2.0 * 2)) * 100 = 8.0 * 100 = $800
+      expect(result?.netDebit).toBe(800);
+      // Max loss = $800
+      expect(result?.maxLoss).toBe(800);
+      // Max gain = ((110 - 100) * 100 * 2) - 800 = 2000 - 800 = $1200
+      expect(result?.maxGain).toBe(1200);
+      // Break-even = 100 + (800 / 200) = 104
+      expect(result?.breakEven).toBe(104);
+    });
+
+    it('should handle wide time spreads (90+ days)', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(
+        100, 110, 7.0, 2.0,
+        '2026-01-16', // ~3 months later
+        '2025-10-24'
+      );
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Time spread should be ~84 days (Oct 24 to Jan 16)
+      expect(result?.timeSpread).toBeGreaterThan(80);
+      expect(result?.timeSpread).toBeLessThan(90);
+    });
+
+    it('should handle narrow spreads (small strike width)', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 102, 3.0, 1.5);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Net debit = (3.0 - 1.5) * 100 = $150
+      expect(result?.netDebit).toBe(150);
+      // Max gain = (2 * 100) - 150 = $50
+      expect(result?.maxGain).toBe(50);
+    });
+  });
+
+  describe('Invalid diagonal spreads', () => {
+    it('should reject same expiration dates', () => {
+      const longCall = createMockOption({
+        strikePrice: 100,
+        ask: 6.0,
+        optionType: 'call',
+        expirationDate: '2025-10-24', // Same expiration!
+      });
+      const shortCall = createMockOption({
+        strikePrice: 110,
+        bid: 2.0,
+        optionType: 'call',
+        expirationDate: '2025-10-24', // Same expiration!
+      });
+
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+      expect(result).toBeNull();
+    });
+
+    it('should reject when long call has shorter expiration than short call', () => {
+      const longCall = createMockOption({
+        strikePrice: 100,
+        ask: 6.0,
+        optionType: 'call',
+        expirationDate: '2025-10-24', // SHORTER expiration (wrong!)
+      });
+      const shortCall = createMockOption({
+        strikePrice: 110,
+        bid: 2.0,
+        optionType: 'call',
+        expirationDate: '2025-11-21', // LONGER expiration (wrong!)
+      });
+
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+      expect(result).toBeNull();
+    });
+
+    it('should reject when both options are not calls', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const longPut = { ...longCall, optionType: 'put' as const };
+
+      const result = calculateDiagonalCallSpread(longPut, shortCall, 1);
+      expect(result).toBeNull();
+    });
+
+    it('should reject when long strike is higher than short strike', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(110, 100, 6.0, 2.0); // Reversed strikes
+
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+      expect(result).toBeNull();
+    });
+
+    it('should reject when long strike equals short strike', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 100, 6.0, 2.0); // Same strikes
+
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Edge cases', () => {
+    it('should handle very small premiums (penny spreads)', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 0.15, 0.05);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Net debit = (0.15 - 0.05) * 100 = $10
+      expect(result?.netDebit).toBe(10);
+      // Max loss = $10
+      expect(result?.maxLoss).toBe(10);
+    });
+
+    it('should handle decimal strike prices', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100.5, 110.5, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 1);
+
+      // Spread width = 10.0
+      expect(result?.maxGain).toBe(600);
+      expect(result?.breakEven).toBe(104.5);
+    });
+
+    it('should handle very large quantities', () => {
+      const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+      const result = calculateDiagonalCallSpread(longCall, shortCall, 100);
+
+      // Net debit = ((6.0 * 100) - (2.0 * 100)) * 100 = $40,000
+      expect(result?.netDebit).toBe(40000);
+      expect(result?.maxLoss).toBe(40000);
+    });
+  });
+});
+
+describe('createDiagonalCallSpread', () => {
+  it('should create valid strategy object', () => {
+    const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+    const strategy = createDiagonalCallSpread('AAPL', longCall, shortCall, 1);
+
+    expect(strategy).not.toBeNull();
+    expect(strategy?.type).toBe('diagonal_call_spread');
+    expect(strategy?.symbol).toBe('AAPL');
+    expect(strategy?.legs).toHaveLength(2);
+    expect(strategy?.legs[0]).toBe(longCall);
+    expect(strategy?.legs[1]).toBe(shortCall);
+    expect(strategy?.maxLoss).toBe(400);
+    expect(strategy?.maxGain).toBe(600);
+    expect(strategy?.breakEvenPrices).toHaveLength(1);
+    expect(strategy?.breakEvenPrices[0]).toBe(104);
+  });
+
+  it('should return null for invalid spreads', () => {
+    const longCall = createMockOption({ strikePrice: 100, expirationDate: '2025-10-24' });
+    const shortCall = createMockOption({ strikePrice: 110, expirationDate: '2025-10-24' });
+
+    const strategy = createDiagonalCallSpread('AAPL', longCall, shortCall, 1);
+    expect(strategy).toBeNull();
+  });
+
+  it('should generate unique IDs', () => {
+    const [longCall, shortCall] = createDiagonalCallSpreadPair(100, 110, 6.0, 2.0);
+    const strategy1 = createDiagonalCallSpread('AAPL', longCall, shortCall, 1);
+    const strategy2 = createDiagonalCallSpread('AAPL', longCall, shortCall, 1);
+
+    expect(strategy1?.id).not.toBe(strategy2?.id);
   });
 });

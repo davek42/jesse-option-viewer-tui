@@ -48,6 +48,12 @@ const initialState: AppState = {
   selectedShortCall: null,
   selectedLegs: [],
 
+  // Dual-expiration support (for diagonal spreads)
+  leg1Expiration: null,
+  leg2Expiration: null,
+  leg1OptionChain: null,
+  leg2OptionChain: null,
+
   // Save confirmation state
   showSaveConfirmation: false,
   strategyToSave: null,
@@ -249,15 +255,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedLongCall: null,
         selectedShortCall: null,
         selectedLegs: [],
+        leg1Expiration: null,
+        leg2Expiration: null,
+        leg1OptionChain: null,
+        leg2OptionChain: null,
       };
 
     case 'SET_STRATEGY_TYPE':
+      // Determine initial builder step based on strategy type
+      let initialStep: typeof state.builderStep;
+      if (action.payload === 'bull_call_spread') {
+        initialStep = 'long';
+      } else if (action.payload === 'diagonal_call_spread') {
+        initialStep = 'expiration1'; // Diagonal spreads start with expiration selection
+      } else {
+        initialStep = 'leg1';
+      }
+
       return {
         ...state,
         selectedStrategyType: action.payload,
         selectedLegs: [], // Clear legs when changing strategy type
-        // Set initial builder step based on strategy type
-        builderStep: action.payload === 'bull_call_spread' ? 'long' : 'leg1',
+        builderStep: initialStep,
       };
 
     case 'SET_BUILDER_STEP':
@@ -296,6 +315,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedLegs: [],
       };
 
+    case 'SET_LEG1_EXPIRATION':
+      return {
+        ...state,
+        leg1Expiration: action.payload,
+      };
+
+    case 'SET_LEG2_EXPIRATION':
+      return {
+        ...state,
+        leg2Expiration: action.payload,
+      };
+
+    case 'SET_LEG1_OPTION_CHAIN':
+      return {
+        ...state,
+        leg1OptionChain: action.payload,
+      };
+
+    case 'SET_LEG2_OPTION_CHAIN':
+      return {
+        ...state,
+        leg2OptionChain: action.payload,
+      };
+
     case 'SHOW_SAVE_CONFIRMATION':
       return {
         ...state,
@@ -323,6 +366,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedLongCall: null,
         selectedShortCall: null,
         selectedLegs: [],
+        leg1Expiration: null,
+        leg2Expiration: null,
+        leg1OptionChain: null,
+        leg2OptionChain: null,
       };
 
     default:

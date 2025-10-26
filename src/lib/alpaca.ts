@@ -244,20 +244,20 @@ export class AlpacaClient {
 
                 return {
                   symbol: osiSymbol,
-                  strikePrice: parsed.strikePrice,
+                  strikePrice: Number(parsed.strikePrice),
                   expirationDate: parsed.expirationDate,
                   optionType: parsed.optionType,
-                  bid: snapshot.latestQuote?.bp || 0,
-                  ask: snapshot.latestQuote?.ap || 0,
-                  lastPrice: snapshot.latestTrade?.p || 0,
-                  volume: snapshot.dailyBar?.v || 0,
-                  openInterest: snapshot.openInterest || 0,
-                  impliedVolatility: snapshot.impliedVolatility,
-                  delta: snapshot.greeks?.delta,
-                  gamma: snapshot.greeks?.gamma,
-                  theta: snapshot.greeks?.theta,
-                  vega: snapshot.greeks?.vega,
-                  rho: snapshot.greeks?.rho,
+                  bid: Number(snapshot.latestQuote?.bp || 0),
+                  ask: Number(snapshot.latestQuote?.ap || 0),
+                  lastPrice: Number(snapshot.latestTrade?.p || 0),
+                  volume: Number(snapshot.dailyBar?.v || 0),
+                  openInterest: Number(snapshot.openInterest || 0),
+                  impliedVolatility: snapshot.impliedVolatility ? Number(snapshot.impliedVolatility) : undefined,
+                  delta: snapshot.greeks?.delta ? Number(snapshot.greeks.delta) : undefined,
+                  gamma: snapshot.greeks?.gamma ? Number(snapshot.greeks.gamma) : undefined,
+                  theta: snapshot.greeks?.theta ? Number(snapshot.greeks.theta) : undefined,
+                  vega: snapshot.greeks?.vega ? Number(snapshot.greeks.vega) : undefined,
+                  rho: snapshot.greeks?.rho ? Number(snapshot.greeks.rho) : undefined,
                 };
               })
               .filter(Boolean) as any[];
@@ -294,14 +294,14 @@ export class AlpacaClient {
 
             return {
               symbol: contract.symbol,
-              strikePrice: contract.strike_price || parsed?.strikePrice || 0,
+              strikePrice: Number(contract.strike_price || parsed?.strikePrice || 0),
               expirationDate: contract.expiration_date,
               optionType: contract.type || parsed?.optionType || 'call',
-              bid: contract.close_price ? contract.close_price * 0.98 : 0, // Estimate bid from close
-              ask: contract.close_price ? contract.close_price * 1.02 : 0, // Estimate ask from close
-              lastPrice: contract.close_price || 0,
-              volume: 0,
-              openInterest: contract.open_interest || 0,
+              bid: Number(contract.close_price ? contract.close_price * 0.98 : 0), // Estimate bid from close
+              ask: Number(contract.close_price ? contract.close_price * 1.02 : 0), // Estimate ask from close
+              lastPrice: Number(contract.close_price || 0),
+              volume: Number(contract.volume || 0),
+              openInterest: Number(contract.open_interest || 0),
               // Greeks not available in v2 endpoint
               impliedVolatility: undefined,
               delta: undefined,

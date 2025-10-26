@@ -143,11 +143,17 @@ export interface AppState {
   // Strategy builder state (Task #9 - Multi-strategy support)
   strategyBuilderActive: boolean;
   selectedStrategyType: StrategyType | null;
-  builderStep: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4';
+  builderStep: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4' | 'expiration1' | 'expiration2';
   selectedLongCall: OptionContract | null;
   selectedShortCall: OptionContract | null;
   // Generic legs for multi-strategy support
   selectedLegs: OptionContract[];
+
+  // Dual-expiration support (for diagonal spreads)
+  leg1Expiration: string | null;
+  leg2Expiration: string | null;
+  leg1OptionChain: OptionChain | null;
+  leg2OptionChain: OptionChain | null;
 
   // Save confirmation state
   showSaveConfirmation: boolean;
@@ -182,12 +188,16 @@ export type AppAction =
   | { type: 'ACTIVATE_STRATEGY_BUILDER'; payload?: StrategyType }
   | { type: 'DEACTIVATE_STRATEGY_BUILDER' }
   | { type: 'SET_STRATEGY_TYPE'; payload: StrategyType }
-  | { type: 'SET_BUILDER_STEP'; payload: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4' }
+  | { type: 'SET_BUILDER_STEP'; payload: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4' | 'expiration1' | 'expiration2' }
   | { type: 'SET_LONG_CALL'; payload: OptionContract | null }
   | { type: 'SET_SHORT_CALL'; payload: OptionContract | null }
   | { type: 'ADD_LEG'; payload: OptionContract }
   | { type: 'REMOVE_LAST_LEG' }
   | { type: 'CLEAR_LEGS' }
+  | { type: 'SET_LEG1_EXPIRATION'; payload: string }
+  | { type: 'SET_LEG2_EXPIRATION'; payload: string }
+  | { type: 'SET_LEG1_OPTION_CHAIN'; payload: OptionChain | null }
+  | { type: 'SET_LEG2_OPTION_CHAIN'; payload: OptionChain | null }
   | { type: 'SHOW_SAVE_CONFIRMATION'; payload: OptionStrategy }
   | { type: 'HIDE_SAVE_CONFIRMATION' }
   | { type: 'CONFIRM_SAVE_STRATEGY' };

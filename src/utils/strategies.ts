@@ -471,6 +471,121 @@ export function createCoveredCall(
 }
 
 /**
+ * Calculate Diagonal Call Spread strategy metrics
+ *
+ * Diagonal Call Spread:
+ * - BUY 1 call at lower strike with LONGER expiration (back month)
+ * - SELL 1 call at higher strike with SHORTER expiration (front month)
+ * - Benefits from time decay on short call while maintaining upside
+ *
+ * @param longCall - The call option to buy (lower strike, longer expiration)
+ * @param shortCall - The call option to sell (higher strike, shorter expiration)
+ * @param quantity - Number of spreads (default: 1)
+ * @returns Strategy metrics or null if invalid
+ */
+export function calculateDiagonalCallSpread(
+  longCall: OptionContract,
+  shortCall: OptionContract,
+  quantity: number = 1
+): {
+  netDebit: number;
+  maxLoss: number;
+  maxGain: number;
+  breakEven: number;
+  profitPotential: number;
+  riskRewardRatio: number;
+  timeSpread: number; // Days between expirations
+} | null {
+  // Validation
+  if (longCall.optionType !== 'call' || shortCall.optionType !== 'call') {
+    return null;
+  }
+
+  if (longCall.strikePrice >= shortCall.strikePrice) {
+    return null; // Long strike must be lower than short strike
+  }
+
+  // CRITICAL: Unlike vertical spreads, diagonal spreads REQUIRE different expirations
+  // Long call must have LONGER expiration than short call
+  if (longCall.expirationDate === shortCall.expirationDate) {
+    return null; // Must have different expirations (this is what makes it "diagonal")
+  }
+
+  // Verify long call has longer expiration
+  const longExpDate = new Date(longCall.expirationDate);
+  const shortExpDate = new Date(shortCall.expirationDate);
+
+  if (longExpDate <= shortExpDate) {
+    return null; // Long call must expire AFTER short call
+  }
+
+  // Calculate time spread (days between expirations)
+  const timeSpread = Math.round((longExpDate.getTime() - shortExpDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Calculate costs (using ask for buy, bid for sell)
+  const longCost = longCall.ask * quantity * 100; // Buy at ask
+  const shortCredit = shortCall.bid * quantity * 100; // Sell at bid
+
+  // Net debit (what you pay to enter the position)
+  const netDebit = longCost - shortCredit;
+
+  // Max loss = Net debit paid (occurs if stock stays below short strike)
+  const maxLoss = netDebit;
+
+  // Max gain calculation for diagonal spreads is complex due to different expirations
+  // Conservative estimate: (Spread width * 100 * quantity) - net debit
+  // This assumes short call expires worthless and long call reaches full intrinsic value
+  const spreadWidth = shortCall.strikePrice - longCall.strikePrice;
+  const maxGain = (spreadWidth * 100 * quantity) - netDebit;
+
+  // Break even (approximate) = Long strike + Net premium per share
+  // Note: This is simplified; actual break-even depends on underlying movement timing
+  const breakEven = longCall.strikePrice + (netDebit / (100 * quantity));
+
+  // Profit potential as percentage
+  const profitPotential = maxLoss > 0 ? (maxGain / maxLoss) * 100 : 0;
+
+  // Risk/Reward ratio
+  const riskRewardRatio = maxLoss > 0 ? maxGain / maxLoss : 0;
+
+  return {
+    netDebit,
+    maxLoss,
+    maxGain,
+    breakEven,
+    profitPotential,
+    riskRewardRatio,
+    timeSpread,
+  };
+}
+
+/**
+ * Create a Diagonal Call Spread strategy object
+ */
+export function createDiagonalCallSpread(
+  symbol: string,
+  longCall: OptionContract,
+  shortCall: OptionContract,
+  quantity: number = 1
+): OptionStrategy | null {
+  const metrics = calculateDiagonalCallSpread(longCall, shortCall, quantity);
+  if (!metrics) return null;
+
+  const id = `diagonal-call-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  return {
+    id,
+    type: 'diagonal_call_spread',
+    symbol,
+    legs: [longCall, shortCall],
+    maxLoss: metrics.maxLoss,
+    maxGain: metrics.maxGain,
+    breakEvenPrices: [metrics.breakEven],
+    createdAt: new Date(),
+  };
+}
+
+/**
  * Format currency value for display
  */
 export function formatCurrency(value: number): string {

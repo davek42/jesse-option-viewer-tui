@@ -144,6 +144,41 @@ export function createStraddlePair(
 }
 
 /**
+ * Create a pair of options for a diagonal call spread
+ *
+ * @param longStrike - Strike price for the long call (lower)
+ * @param shortStrike - Strike price for the short call (higher)
+ * @param longAsk - Ask price for the long call
+ * @param shortBid - Bid price for the short call
+ * @param longExpiration - Expiration date for long call (LONGER)
+ * @param shortExpiration - Expiration date for short call (SHORTER)
+ * @returns Tuple of [longCall, shortCall]
+ */
+export function createDiagonalCallSpreadPair(
+  longStrike: number = 100,
+  shortStrike: number = 110,
+  longAsk: number = 6.0,
+  shortBid: number = 2.0,
+  longExpiration: string = '2025-11-21', // Longer expiration
+  shortExpiration: string = '2025-10-24'  // Shorter expiration
+): [OptionContract, OptionContract] {
+  return [
+    createMockOption({
+      strikePrice: longStrike,
+      ask: longAsk,
+      optionType: 'call',
+      expirationDate: longExpiration,
+    }),
+    createMockOption({
+      strikePrice: shortStrike,
+      bid: shortBid,
+      optionType: 'call',
+      expirationDate: shortExpiration,
+    }),
+  ];
+}
+
+/**
  * Create four legs for an iron condor
  *
  * Order: [longPut, shortPut, shortCall, longCall]

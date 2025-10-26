@@ -29,7 +29,7 @@ interface OptionChainScreenProps {
   strategyBuilderActive?: boolean;
 
   /** Current builder selection step (Task #9 - Multi-strategy support) */
-  builderStep?: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4';
+  builderStep?: 'long' | 'short' | 'leg1' | 'leg2' | 'leg3' | 'leg4' | 'expiration1' | 'expiration2';
 
   /** Selected long call for strategy */
   selectedLongCall?: OptionContract | null;
@@ -79,6 +79,8 @@ export function OptionChainScreen({
     displayLimit,
     selectedStrategyType,
     selectedLegs,
+    leg1OptionChain,
+    leg2OptionChain,
   } = state;
 
   // Auto-select first expiration if none selected
@@ -232,12 +234,47 @@ export function OptionChainScreen({
       )}
 
       {/* FULL-SCREEN MODAL MODE: Strategy Builder */}
-      {strategyBuilderActive && optionChain ? (
+      {strategyBuilderActive && (builderStep === 'expiration1' || builderStep === 'expiration2') ? (
+        <Box marginBottom={2} flexDirection="column" borderStyle="double" borderColor="green" paddingX={1}>
+          <Box marginBottom={1}>
+            <Text bold color="green">
+              🏗️  Diagonal Call Spread Builder
+            </Text>
+            <Text dimColor> (Step {builderStep === 'expiration1' ? '1' : '3'}: Select Expiration)</Text>
+          </Box>
+          <Box marginBottom={1}>
+            <Text>
+              <Text bold color="cyan">{builderStep === 'expiration1' ? 'Step 1:' : 'Step 3:'}</Text>
+              {' '}Select {builderStep === 'expiration1' ? 'LONGER' : 'SHORTER'} expiration for leg {builderStep === 'expiration1' ? '1' : '2'}
+            </Text>
+            <Text dimColor> (↑↓ Navigate | Enter Select | Esc Cancel)</Text>
+          </Box>
+          <ExpirationSelect
+            expirations={availableExpirations}
+            selectedExpiration={selectedExpiration}
+            onSelect={() => {}} // Handled by global input handler in App.tsx
+            highlightedIndex={highlightedIndex}
+            isFocused={true}
+          />
+        </Box>
+      ) : strategyBuilderActive && (optionChain || leg1OptionChain || leg2OptionChain) ? (
         <Box marginBottom={2}>
           <StrategyBuilder
             strategyType={selectedStrategyType || 'bull_call_spread'}
-            calls={optionChain.calls}
-            puts={optionChain.puts}
+            calls={
+              selectedStrategyType === 'diagonal_call_spread'
+                ? builderStep === 'leg1'
+                  ? leg1OptionChain?.calls || []
+                  : builderStep === 'leg2'
+                  ? leg2OptionChain?.calls || []
+                  : []
+                : optionChain?.calls || []
+            }
+            puts={
+              selectedStrategyType === 'diagonal_call_spread'
+                ? [] // Diagonal call spreads only use calls
+                : optionChain?.puts || []
+            }
             stockPrice={stockQuote?.price || 0}
             longCall={selectedLongCall}
             shortCall={selectedShortCall}
