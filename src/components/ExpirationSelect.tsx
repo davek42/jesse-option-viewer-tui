@@ -33,7 +33,15 @@ function formatExpirationDate(dateStr: string): {
   isToday: boolean;
   isWeekly: boolean;
 } {
-  const date = new Date(dateStr);
+  // Parse date string manually to avoid timezone issues
+  // Input format: YYYY-MM-DD
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const year = parseInt(yearStr!, 10);
+  const month = parseInt(monthStr!, 10) - 1; // Month is 0-indexed
+  const day = parseInt(dayStr!, 10);
+
+  // Create date in local timezone (not UTC)
+  const date = new Date(year, month, day);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -43,15 +51,13 @@ function formatExpirationDate(dateStr: string): {
 
   // Format date
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = monthNames[date.getMonth()];
-  const day = date.getDate();
-  const year = date.getFullYear();
+  const monthName = monthNames[month];
 
   // Check if it's a weekly (Friday) expiration
   const isWeekly = date.getDay() === 5; // 5 = Friday
 
   return {
-    formatted: `${month} ${day}, ${year}`,
+    formatted: `${monthName} ${day}, ${year}`,
     daysUntil,
     isToday: daysUntil === 0,
     isWeekly,
