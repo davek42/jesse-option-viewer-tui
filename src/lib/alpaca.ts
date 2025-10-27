@@ -182,18 +182,25 @@ export class AlpacaClient {
 
       const sortedExpirations = Array.from(expirationDates).sort();
 
-      if (sortedExpirations.length === 0) {
-        logger.warning(`No expiration dates found for ${symbol.toUpperCase()}`);
+      // Filter out past expiration dates (only show today or future dates)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset to start of day for comparison
+      const todayString = today.toISOString().split('T')[0]!; // Format: YYYY-MM-DD
+
+      const futureExpirations = sortedExpirations.filter(date => date >= todayString);
+
+      if (futureExpirations.length === 0) {
+        logger.warning(`No future expiration dates found for ${symbol.toUpperCase()}`);
         return null;
       }
 
       logger.success(
-        `✅ Found ${sortedExpirations.length} expiration dates for ${symbol.toUpperCase()} (${sortedExpirations[0]} to ${sortedExpirations[sortedExpirations.length - 1]})`
+        `✅ Found ${futureExpirations.length} expiration dates for ${symbol.toUpperCase()} (${futureExpirations[0]} to ${futureExpirations[futureExpirations.length - 1]})`
       );
 
       return {
         symbol: symbol.toUpperCase(),
-        dates: sortedExpirations,
+        dates: futureExpirations,
       };
     } catch (error) {
       logger.error(`Failed to fetch expiration dates for ${symbol}`, error);
