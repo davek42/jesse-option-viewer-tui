@@ -20,6 +20,8 @@ interface StrategySelectorProps {
 const AVAILABLE_STRATEGIES: StrategyType[] = [
   'bull_call_spread',
   'bear_put_spread',
+  'bull_put_spread',
+  'bear_call_spread',
   'diagonal_call_spread',
   'iron_condor',
   'long_straddle',
@@ -173,22 +175,21 @@ function getStrategyCharacteristics(type: StrategyType): {
       legs: 2,
       complexity: '⭐ Easy',
     },
-    // Defaults for other strategies
     bull_put_spread: {
-      bias: 'Bullish',
+      bias: '📈 Bullish (Credit)',
       color: 'green',
       risk: 'Limited',
       riskColor: 'green',
       legs: 2,
-      complexity: 'Easy',
+      complexity: '⭐ Easy',
     },
     bear_call_spread: {
-      bias: 'Bearish',
+      bias: '📉 Bearish (Credit)',
       color: 'red',
       risk: 'Limited',
       riskColor: 'green',
       legs: 2,
-      complexity: 'Easy',
+      complexity: '⭐ Easy',
     },
     diagonal_call_spread: {
       bias: '📈 Bullish + Time',

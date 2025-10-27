@@ -772,12 +772,12 @@ function GlobalInputHandler() {
           if (key.upArrow || input === 'k') {
             setHighlightedIndex((prev) => Math.max(0, prev - 1));
           } else if (key.downArrow || input === 'j') {
-            // 6 available strategies
-            setHighlightedIndex((prev) => Math.min(5, prev + 1));
+            // 8 available strategies (0-7)
+            setHighlightedIndex((prev) => Math.min(7, prev + 1));
           }
           // Select strategy type
           else if (key.return) {
-            const strategies: StrategyType[] = ['bull_call_spread', 'bear_put_spread', 'diagonal_call_spread', 'iron_condor', 'long_straddle', 'covered_call'];
+            const strategies: StrategyType[] = ['bull_call_spread', 'bear_put_spread', 'bull_put_spread', 'bear_call_spread', 'diagonal_call_spread', 'iron_condor', 'long_straddle', 'covered_call'];
             const selectedType = strategies[highlightedIndex];
             if (selectedType) {
               dispatch({ type: 'SET_STRATEGY_TYPE', payload: selectedType });
