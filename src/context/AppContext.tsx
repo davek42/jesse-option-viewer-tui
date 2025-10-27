@@ -193,6 +193,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
 
     case 'SET_AVAILABLE_EXPIRATIONS':
+      logger.debug(`📅 Reducer: Setting availableExpirations to: ${action.payload.join(', ')}`);
       return {
         ...state,
         availableExpirations: action.payload,

@@ -1350,6 +1350,7 @@ function GlobalInputHandler() {
         // Fetch expiration dates
         const expirations = await client.getExpirationDates(symbol);
         if (expirations) {
+          logger.debug(`📅 App.tsx: Dispatching SET_AVAILABLE_EXPIRATIONS with ${expirations.dates.length} dates: ${expirations.dates.join(', ')}`);
           dispatch({ type: 'SET_AVAILABLE_EXPIRATIONS', payload: expirations.dates });
           // Switch to symbol detail screen
           dispatch({ type: 'SET_SCREEN', payload: 'symbolDetail' });

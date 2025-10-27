@@ -187,7 +187,12 @@ export class AlpacaClient {
       today.setHours(0, 0, 0, 0); // Reset to start of day for comparison
       const todayString = today.toISOString().split('T')[0]!; // Format: YYYY-MM-DD
 
+      logger.debug(`📅 Today's date for filtering: ${todayString}`);
+      logger.debug(`📅 All expirations before filtering: ${sortedExpirations.join(', ')}`);
+
       const futureExpirations = sortedExpirations.filter(date => date >= todayString);
+
+      logger.debug(`📅 Expirations after filtering (>= ${todayString}): ${futureExpirations.join(', ')}`);
 
       if (futureExpirations.length === 0) {
         logger.warning(`No future expiration dates found for ${symbol.toUpperCase()}`);

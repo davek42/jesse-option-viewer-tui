@@ -85,9 +85,11 @@ export function OptionChainScreen({
 
   // Auto-select first expiration if none selected
   useEffect(() => {
+    logger.debug(`📅 OptionChainScreen: availableExpirations = [${availableExpirations.join(', ')}], selectedExpiration = ${selectedExpiration}`);
     if (availableExpirations.length > 0 && !selectedExpiration) {
       const firstExpiration = availableExpirations[0];
       if (firstExpiration) {
+        logger.debug(`📅 OptionChainScreen: Auto-selecting first expiration: ${firstExpiration}`);
         handleExpirationSelect(firstExpiration);
       }
     }
