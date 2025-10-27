@@ -1,5 +1,8 @@
 // AIDEV-NOTE: Core type definitions for the option viewer application
 
+// Task #18: Import TradingMode from config
+import type { TradingMode } from '../config/index.js';
+
 /**
  * Application mode types
  */
@@ -158,6 +161,15 @@ export interface AppState {
   // Save confirmation state
   showSaveConfirmation: boolean;
   strategyToSave: OptionStrategy | null;
+
+  // Trading mode state (Task #18 Phase 3)
+  tradingMode: TradingMode;
+  liveCredentialsConfigured: boolean;
+  showModeConfirmation: boolean;
+  pendingModeSwitch: TradingMode | null;
+
+  // Validation state (Task #18 Phase 5)
+  validationWarnings: string[];
 }
 
 /**
@@ -200,4 +212,10 @@ export type AppAction =
   | { type: 'SET_LEG2_OPTION_CHAIN'; payload: OptionChain | null }
   | { type: 'SHOW_SAVE_CONFIRMATION'; payload: OptionStrategy }
   | { type: 'HIDE_SAVE_CONFIRMATION' }
-  | { type: 'CONFIRM_SAVE_STRATEGY' };
+  | { type: 'CONFIRM_SAVE_STRATEGY' }
+  | { type: 'REQUEST_MODE_SWITCH'; payload: TradingMode }
+  | { type: 'CONFIRM_MODE_SWITCH' }
+  | { type: 'CANCEL_MODE_SWITCH' }
+  | { type: 'SET_TRADING_MODE'; payload: TradingMode }
+  | { type: 'SET_LIVE_CREDENTIALS_STATUS'; payload: boolean }
+  | { type: 'SET_VALIDATION_WARNINGS'; payload: string[] };

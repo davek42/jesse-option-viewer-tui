@@ -9,7 +9,7 @@ import { useAppContext } from '../context/AppContext.js';
  */
 export function StatusBar() {
   const { state } = useAppContext();
-  const { mode, inputBuffer, commandBuffer, statusMessage, statusType } = state;
+  const { mode, inputBuffer, commandBuffer, statusMessage, statusType, tradingMode } = state;
 
   const statusColors = {
     info: 'blue',
@@ -28,6 +28,14 @@ export function StatusBar() {
           {mode === 'navigation' && '[ NAVIGATION ]'}
           {mode === 'input' && '[ INPUT ]'}
           {mode === 'command' && '[ COMMAND ]'}
+        </Text>
+
+        {/* Trading mode indicator (Task #18) */}
+        <Text bold color={tradingMode === 'paper' ? 'green' : 'red'}>
+          {' '}
+          {tradingMode === 'paper' ? '🟢' : '🔴'}
+          {' '}
+          {tradingMode.toUpperCase()}
         </Text>
 
         {/* Input/Command buffer */}

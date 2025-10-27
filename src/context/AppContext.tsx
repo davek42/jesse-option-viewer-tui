@@ -4,6 +4,15 @@ import React, { createContext, useContext, useReducer, useEffect, type ReactNode
 import type { AppState, AppAction } from '../types/index.js';
 import { loadStrategies, saveStrategies } from '../utils/storage.js';
 import { logger } from '../utils/logger.js';
+// Task #18: Import config functions for trading mode
+import { loadConfig, isLiveTradingAvailable, updateTradingMode } from '../config/index.js';
+// Task #18 Phase 5: Import audit logger
+import {
+  auditModeSwitchRequest,
+  auditModeSwitchConfirmed,
+  auditModeSwitchCancelled,
+  auditAppStartup,
+} from '../utils/auditLogger.js';
 
 /**
  * Initial application state
@@ -57,6 +66,16 @@ const initialState: AppState = {
   // Save confirmation state
   showSaveConfirmation: false,
   strategyToSave: null,
+
+  // Trading mode state (Task #18 Phase 3)
+  // Initialize with defaults - will be set properly in useEffect
+  tradingMode: 'paper', // Always starts in paper mode for safety
+  liveCredentialsConfigured: false, // Will be set in useEffect
+  showModeConfirmation: false,
+  pendingModeSwitch: null,
+
+  // Validation state (Task #18 Phase 5)
+  validationWarnings: [],
 };
 
 /**
@@ -373,6 +392,69 @@ function appReducer(state: AppState, action: AppAction): AppState {
         leg2OptionChain: null,
       };
 
+    // Trading mode actions (Task #18 Phase 3)
+    case 'REQUEST_MODE_SWITCH':
+      // Show confirmation dialog with pending mode
+      logger.info(`🔄 Requesting mode switch to: ${action.payload.toUpperCase()}`);
+      // Audit log (Phase 5)
+      auditModeSwitchRequest(state.tradingMode, action.payload);
+      return {
+        ...state,
+        showModeConfirmation: true,
+        pendingModeSwitch: action.payload,
+      };
+
+    case 'CONFIRM_MODE_SWITCH':
+      // Actually perform the mode switch
+      if (!state.pendingModeSwitch) return state;
+
+      logger.success(`✅ Confirmed mode switch to: ${state.pendingModeSwitch.toUpperCase()}`);
+      // Audit log (Phase 5)
+      auditModeSwitchConfirmed(state.tradingMode, state.pendingModeSwitch);
+      return {
+        ...state,
+        tradingMode: state.pendingModeSwitch,
+        showModeConfirmation: false,
+        pendingModeSwitch: null,
+        validationWarnings: [], // Clear warnings
+      };
+
+    case 'CANCEL_MODE_SWITCH':
+      // Cancel the mode switch
+      logger.info('❌ Cancelled mode switch');
+      // Audit log (Phase 5)
+      if (state.pendingModeSwitch) {
+        auditModeSwitchCancelled(state.tradingMode, state.pendingModeSwitch);
+      }
+      return {
+        ...state,
+        showModeConfirmation: false,
+        pendingModeSwitch: null,
+        validationWarnings: [], // Clear warnings
+      };
+
+    case 'SET_TRADING_MODE':
+      // Direct mode switch (used internally, bypasses confirmation)
+      logger.info(`🔄 Setting trading mode to: ${action.payload.toUpperCase()}`);
+      return {
+        ...state,
+        tradingMode: action.payload,
+      };
+
+    case 'SET_LIVE_CREDENTIALS_STATUS':
+      // Update live credentials status (Task #18)
+      return {
+        ...state,
+        liveCredentialsConfigured: action.payload,
+      };
+
+    case 'SET_VALIDATION_WARNINGS':
+      // Set validation warnings (Task #18 Phase 5)
+      return {
+        ...state,
+        validationWarnings: action.payload,
+      };
+
     default:
       return state;
   }
@@ -408,6 +490,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
+  // Initialize trading mode and credentials from config on mount (Task #18)
+  useEffect(() => {
+    const config = loadConfig();
+
+    // Set trading mode (always starts in paper for safety)
+    dispatch({ type: 'SET_TRADING_MODE', payload: config.tradingMode });
+
+    // Check if live credentials are configured
+    const liveAvailable = isLiveTradingAvailable(config);
+    dispatch({ type: 'SET_LIVE_CREDENTIALS_STATUS', payload: liveAvailable });
+
+    logger.info(`🔧 Initialized: Mode=${config.tradingMode.toUpperCase()}, Live=${liveAvailable ? 'Available' : 'Not Available'}`);
+
+    // Audit log app startup (Phase 5)
+    auditAppStartup(config.tradingMode, liveAvailable);
+  }, []);
+
   // Auto-save strategies to disk whenever they change (Task #8 Enhancement - Persistence)
   useEffect(() => {
     // Skip save on initial mount (strategies are empty initially)
@@ -420,6 +519,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await saveStrategies(state.savedStrategies);
     })();
   }, [state.savedStrategies]);
+
+  // Auto-save trading mode to config when it changes (Task #18 Phase 3)
+  useEffect(() => {
+    // Skip on initial mount
+    if (state.tradingMode === initialState.tradingMode) {
+      return;
+    }
+
+    // Update config file with new trading mode
+    const config = loadConfig();
+    updateTradingMode(state.tradingMode, config);
+    logger.info(`💾 Saved trading mode preference: ${state.tradingMode.toUpperCase()}`);
+  }, [state.tradingMode]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
