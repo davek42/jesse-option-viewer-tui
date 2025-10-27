@@ -27,6 +27,11 @@
 15. Implement the option strategy selection for Butterfly Spread
 16. Implement the option strategy selection for Condor Spread
 17. Implement the option strategy selection for Strangle Spread
+18. **Add Live Trading Support** - Enable switching between Paper and Live trading modes
+    - Hybrid configuration approach (env vars + config file)
+    - Runtime mode switching with UI
+    - Safety features and confirmations
+    - Visual indicators and warnings
 
 ## Implementation Details
 
@@ -85,6 +90,289 @@ The application should:
 - Add quick strategy duplication feature (copy existing strategy to build similar one)
 - Sort saved strategies by symbol or date
 
+
+## Task 18: Live Trading Support - Implementation Plan
+
+### Overview
+Add support for Alpaca Live Trading alongside Paper Trading, with runtime mode switching and comprehensive safety features.
+
+### Requirements
+- **Hybrid Configuration**: Support both environment variables and config file
+- **Runtime Switching**: Allow users to switch modes without restart
+- **Default Behavior**: Always start in Paper mode, but remember last mode selection
+- **Safety**: Confirm EVERY mode switch (both to live and to paper)
+- **UI**: Provide both settings screen and slash command for switching
+
+### Phase 1: Configuration System
+
+#### 1.1 Configuration Types
+Create `src/config/types.ts`:
+```typescript
+export type TradingMode = 'paper' | 'live';
+
+export interface AppConfig {
+  tradingMode: TradingMode;
+  lastUsedMode: TradingMode;  // Remember user preference
+  credentials: {
+    paper: {
+      apiKey: string;
+      secretKey: string;
+    };
+    live?: {  // Optional - not everyone has live keys
+      apiKey: string;
+      secretKey: string;
+    };
+  };
+  preferences: {
+    alwaysDefaultToPaper: boolean;  // Safety: always start in paper
+    confirmModeSwitch: boolean;     // Require confirmation
+  };
+}
+```
+
+#### 1.2 Configuration Manager
+Create `src/config/manager.ts`:
+- `loadConfig(): AppConfig` - Load from file or env vars
+- `saveConfig(config: AppConfig): void` - Persist to config file
+- `validateCredentials(mode: TradingMode): boolean` - Validate keys exist
+- `getConfigPath(): string` - Get platform-specific config location
+- Priority: Environment variables > Config file > Defaults
+
+#### 1.3 Config File Location
+- macOS/Linux: `~/.config/jesse-option-viewer/config.json`
+- Windows: `%APPDATA%/jesse-option-viewer/config.json`
+- Auto-create on first run from env vars
+
+#### 1.4 Environment Variable Support (Backward Compatible)
+```bash
+# .env.local - Backward compatible
+ALPACA_API_KEY=PKxxxxxx          # Paper key (existing)
+ALPACA_SECRET_KEY=xxxxx          # Paper secret (existing)
+
+# New variables (optional)
+ALPACA_LIVE_API_KEY=AKxxxxxx     # Live key
+ALPACA_LIVE_SECRET_KEY=xxxxx     # Live secret
+ALPACA_TRADING_MODE=paper        # Default mode
+```
+
+### Phase 2: Update Alpaca Client
+
+#### 2.1 Modify `src/lib/alpaca.ts`
+```typescript
+export function getAlpacaClient(mode?: TradingMode): AlpacaClient {
+  const config = loadConfig();
+  const tradingMode = mode || config.tradingMode;
+
+  // Select appropriate endpoint
+  const baseURL = tradingMode === 'live'
+    ? 'https://api.alpaca.markets'
+    : 'https://paper-api.alpaca.markets';
+
+  // Get credentials for mode
+  const credentials = config.credentials[tradingMode];
+
+  if (!credentials) {
+    throw new Error(`No ${tradingMode} trading credentials configured`);
+  }
+
+  // Log mode for audit trail
+  logger.info(`🔗 Connecting to Alpaca ${tradingMode.toUpperCase()} trading`);
+
+  return new AlpacaClient(baseURL, credentials.apiKey, credentials.secretKey);
+}
+```
+
+#### 2.2 Add Mode Validation
+- Validate API key format (PK* for paper, AK* for live)
+- Test connection before allowing switch
+- Handle authentication errors gracefully
+
+### Phase 3: State Management
+
+#### 3.1 Add to AppContext State
+```typescript
+interface AppState {
+  // ... existing state
+  tradingMode: TradingMode;
+  liveCredentialsConfigured: boolean;
+  showModeConfirmation: boolean;
+  pendingModeSwitch?: TradingMode;
+}
+```
+
+#### 3.2 New Actions
+```typescript
+type AppAction =
+  | { type: 'REQUEST_MODE_SWITCH'; payload: TradingMode }
+  | { type: 'CONFIRM_MODE_SWITCH' }
+  | { type: 'CANCEL_MODE_SWITCH' }
+  | { type: 'SET_TRADING_MODE'; payload: TradingMode }
+  // ... existing actions
+```
+
+### Phase 4: UI Components
+
+#### 4.1 Header Component Updates
+Always show prominent mode indicator:
+```
+Paper Mode:
+┌──────────────────────────────────────────────────┐
+│ 📊 Jesse Option Chain Viewer  [🟢 PAPER MODE]  │
+└──────────────────────────────────────────────────┘
+
+Live Mode (with warning):
+┌──────────────────────────────────────────────────┐
+│ 📊 Jesse Option Chain Viewer  [🔴 LIVE MODE]   │
+│ ⚠️  REAL MONEY TRADING ACTIVE                    │
+└──────────────────────────────────────────────────┘
+```
+
+Color scheme:
+- **Paper**: Green background on badge
+- **Live**: Red/Yellow background on badge, bold warning
+
+#### 4.2 Status Bar Updates
+Always display mode:
+```
+[PAPER] SPY @ $582.50 | Ready
+[LIVE ⚠️] SPY @ $582.50 | REAL MONEY MODE
+```
+
+#### 4.3 Mode Confirmation Dialog
+Create `src/components/ModeConfirmationDialog.tsx`:
+```
+┌────────────────────────────────────────────┐
+│ ⚠️  SWITCH TO LIVE TRADING MODE?           │
+│                                            │
+│ This will connect to your LIVE Alpaca     │
+│ account using REAL MONEY.                 │
+│                                            │
+│ Current: PAPER MODE                       │
+│ Switch to: LIVE MODE                      │
+│                                            │
+│ Are you sure you want to continue?        │
+│                                            │
+│ [Yes, Switch] [Cancel]                    │
+└────────────────────────────────────────────┘
+```
+
+Show for BOTH directions:
+- Paper → Live: "REAL MONEY" warning
+- Live → Paper: "SIMULATION MODE" confirmation
+
+#### 4.4 Settings Screen
+Create new settings screen with mode selection:
+```
+⚙️  Settings
+─────────────
+
+Trading Mode
+  Current: [🟢 PAPER MODE]
+
+  Available Modes:
+  • Paper Trading (Simulated) ✓
+  • Live Trading (Real Money) [Configure]
+
+  [Switch Mode] [Back]
+
+Preferences
+  ☑ Always start in Paper mode
+  ☑ Confirm mode switches
+
+[Save] [Cancel]
+```
+
+Access via:
+- Keyboard: 'm' key to open mode switcher
+- Command: '/settings' or '/config'
+
+#### 4.5 Slash Commands
+Add to command handler:
+```
+/mode             - Show current mode and switch options
+/mode live        - Request switch to live (with confirmation)
+/mode paper       - Request switch to paper (with confirmation)
+/mode status      - Display current mode details
+```
+
+### Phase 5: Safety Features
+
+#### 5.1 Mode Switch Validation
+- Always require confirmation (both directions)
+- Validate credentials exist for target mode
+- Test connection before completing switch
+- Show error if switch fails
+
+#### 5.2 Visual Warnings
+- **Live Mode**: Red/yellow persistent indicators
+- **Paper Mode**: Green reassuring indicators
+- Warning icon on every screen when in live mode
+- Persistent reminder in status bar
+
+#### 5.3 Audit Logging
+```typescript
+logger.warn(`🔴 SWITCHED TO LIVE TRADING MODE at ${timestamp} by user`);
+logger.info(`🟢 Switched to paper trading mode at ${timestamp} by user`);
+logger.info(`📊 Trading mode on startup: ${mode} (default: paper)`);
+```
+
+#### 5.4 Default Behavior
+- **Always** start in paper mode on launch
+- Load `lastUsedMode` from config to show in UI
+- User must explicitly switch to live each session
+- Prevent accidental live trading
+
+#### 5.5 Credential Validation
+- Check API key format (PK* vs AK*)
+- Verify key matches mode
+- Test connection before allowing switch
+- Clear error messages for mismatched keys
+
+### Phase 6: Testing
+
+#### 6.1 Unit Tests
+- Config loading with various combinations
+- Mode switching state transitions
+- Credential validation
+- Endpoint selection logic
+
+#### 6.2 Integration Tests
+- Switch modes and verify endpoint changes
+- Test with missing credentials
+- Verify confirmation flow
+- Test env var priority over config file
+
+#### 6.3 Manual Testing Checklist
+- [ ] Start app in paper mode (default)
+- [ ] Switch to live mode (with confirmation)
+- [ ] Switch back to paper (with confirmation)
+- [ ] Restart app (should be in paper)
+- [ ] Try switching without live credentials
+- [ ] Verify visual indicators in both modes
+- [ ] Test slash commands
+- [ ] Test settings screen
+- [ ] Verify audit logs
+
+### Implementation Order
+
+1. **Phase 1**: Configuration system (types, manager, file handling)
+2. **Phase 2**: Update Alpaca client with mode support
+3. **Phase 3**: Add state management for mode switching
+4. **Phase 4.1-4.2**: Visual indicators (header, status bar)
+5. **Phase 4.3**: Confirmation dialog
+6. **Phase 4.4**: Settings screen
+7. **Phase 4.5**: Slash commands
+8. **Phase 5**: All safety features
+9. **Phase 6**: Testing
+
+### Success Criteria
+- ✅ Can switch between paper and live at runtime
+- ✅ Always starts in paper mode
+- ✅ Requires confirmation for every switch
+- ✅ Clear visual indicators of current mode
+- ✅ Backward compatible with existing env vars
+- ✅ Comprehensive audit logging
+- ✅ No accidental live trading possible
 
 ## Further Enhancements
 

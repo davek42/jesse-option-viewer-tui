@@ -1,9 +1,11 @@
-// AIDEV-NOTE: Alpaca API wrapper methods for secure option chain data fetching
+// AIDEV-NOTE: Alpaca API wrapper methods for secure option chain data fetching (Task #18 Phase 2)
 
 import Alpaca from '@alpacahq/alpaca-trade-api';
 import { logger } from '../utils/logger.js';
 import { rateLimitedFetch, parseOptionSymbol } from '../utils/fetch.js';
 import type { StockQuote, OptionChain, OptionContract, ExpirationDates } from '../types/index.js';
+import { loadConfig, validateCredentials, getApiBaseUrl } from '../config/index.js';
+import type { TradingMode } from '../config/index.js';
 
 /**
  * Alpaca API client configuration
@@ -27,29 +29,48 @@ const ALPACA_URLS = {
 /**
  * AlpacaClient - Wrapper for Alpaca Markets API
  * Handles authentication and data fetching for stocks and options
+ *
+ * Task #18: Now supports both paper and live trading modes
  */
 export class AlpacaClient {
   private client: Alpaca;
   private config: AlpacaConfig;
   private tradingBaseUrl: string;
   private dataBaseUrl: string;
+  private tradingMode: TradingMode;
 
-  constructor(config?: Partial<AlpacaConfig>) {
-    // AIDEV-NOTE: API keys loaded from environment variables for security
+  constructor(tradingMode?: TradingMode, config?: Partial<AlpacaConfig>) {
+    // Load configuration from config system (Task #18)
+    const appConfig = loadConfig();
+
+    // Use provided mode or fall back to config mode
+    this.tradingMode = tradingMode || appConfig.tradingMode;
+
+    // Validate credentials for the selected mode
+    if (!validateCredentials(this.tradingMode, appConfig)) {
+      logger.error(`❌ Invalid or missing ${this.tradingMode} trading credentials`);
+      throw new Error(
+        `Missing or invalid ${this.tradingMode} trading credentials. ` +
+        `Please configure ${this.tradingMode.toUpperCase()} API keys.`
+      );
+    }
+
+    // Get credentials for the selected mode
+    const credentials = appConfig.credentials[this.tradingMode];
+    if (!credentials) {
+      throw new Error(`No credentials configured for ${this.tradingMode} mode`);
+    }
+
+    // Build config with mode-specific credentials
     this.config = {
-      keyId: config?.keyId || process.env.ALPACA_API_KEY || '',
-      secretKey: config?.secretKey || process.env.ALPACA_API_SECRET || '',
-      paper: config?.paper ?? (process.env.ALPACA_PAPER === 'true'),
+      keyId: config?.keyId || credentials.apiKey,
+      secretKey: config?.secretKey || credentials.secretKey,
+      paper: this.tradingMode === 'paper',
       feed: config?.feed || process.env.ALPACA_DATA_FEED || 'indicative',
     };
 
-    if (!this.config.keyId || !this.config.secretKey) {
-      logger.error('❌ Alpaca API credentials not found in environment variables');
-      throw new Error('Missing Alpaca API credentials. Please set ALPACA_API_KEY and ALPACA_API_SECRET');
-    }
-
-    // Set base URLs based on paper/live mode
-    this.tradingBaseUrl = this.config.paper ? ALPACA_URLS.PAPER_TRADING : ALPACA_URLS.LIVE_TRADING;
+    // Set base URLs based on trading mode
+    this.tradingBaseUrl = getApiBaseUrl(this.tradingMode);
     this.dataBaseUrl = ALPACA_URLS.DATA;
 
     this.client = new Alpaca({
@@ -59,9 +80,22 @@ export class AlpacaClient {
       feed: this.config.feed,
     });
 
+    // Log connection with clear mode indicator
+    const modeLabel = this.tradingMode.toUpperCase();
+    const modeEmoji = this.tradingMode === 'paper' ? '🟢' : '🔴';
+    const warningText = this.tradingMode === 'live' ? ' ⚠️  REAL MONEY' : '';
+
+    logger.info(`🔗 Connecting to Alpaca ${modeEmoji} ${modeLabel} trading${warningText}`);
     logger.success(
-      `🔑 Alpaca client initialized (${this.config.paper ? 'PAPER' : 'LIVE'} trading, feed: ${this.config.feed})`
+      `🔑 Alpaca client initialized (${modeLabel} mode, feed: ${this.config.feed})`
     );
+  }
+
+  /**
+   * Get the current trading mode
+   */
+  getTradingMode(): TradingMode {
+    return this.tradingMode;
   }
 
   /**
@@ -360,37 +394,84 @@ export class AlpacaClient {
 
   /**
    * Test connection to Alpaca API
+   * Task #18: Now includes mode-specific validation and clear logging
    */
   async testConnection(): Promise<boolean> {
     try {
-      logger.info('🔌 Testing Alpaca API connection...');
+      const modeLabel = this.tradingMode.toUpperCase();
+      const modeEmoji = this.tradingMode === 'paper' ? '🟢' : '🔴';
+
+      logger.info(`🔌 Testing Alpaca ${modeEmoji} ${modeLabel} API connection...`);
       const account = await this.client.getAccount();
 
       if (account) {
-        logger.success('✅ Alpaca API connection successful');
+        logger.success(`✅ Alpaca ${modeLabel} API connection successful`);
         logger.debug('Account status', {
           id: account.id,
           status: account.status,
           cash: account.cash,
           portfolio_value: account.portfolio_value,
+          trading_mode: this.tradingMode,
         });
+
+        // Extra warning for live mode
+        if (this.tradingMode === 'live') {
+          logger.warning('⚠️  Connected to LIVE trading account - REAL MONEY at risk');
+        }
+
         return true;
       }
 
       return false;
     } catch (error) {
-      logger.error('Failed to connect to Alpaca API', error);
+      logger.error(`Failed to connect to Alpaca ${this.tradingMode.toUpperCase()} API`, error);
       return false;
     }
   }
 }
 
-// Export singleton instance
-let alpacaInstance: AlpacaClient | null = null;
+// Task #18: Mode-aware singleton pattern
+// Store separate instances for paper and live modes
+const alpacaInstances: Record<TradingMode, AlpacaClient | null> = {
+  paper: null,
+  live: null,
+};
 
-export function getAlpacaClient(config?: Partial<AlpacaConfig>): AlpacaClient {
-  if (!alpacaInstance) {
-    alpacaInstance = new AlpacaClient(config);
+/**
+ * Get Alpaca client instance for a specific trading mode
+ * Task #18: Now mode-aware - maintains separate instances for paper and live
+ *
+ * @param mode - Trading mode (optional, defaults to config mode)
+ * @param forceNew - Force creation of new instance (for mode switches)
+ * @returns AlpacaClient instance for the specified mode
+ */
+export function getAlpacaClient(mode?: TradingMode, forceNew: boolean = false): AlpacaClient {
+  // Load config to get current mode if not specified
+  const appConfig = loadConfig();
+  const tradingMode = mode || appConfig.tradingMode;
+
+  // Create new instance if forced or doesn't exist
+  if (forceNew || !alpacaInstances[tradingMode]) {
+    logger.info(`🔧 Creating new AlpacaClient instance for ${tradingMode.toUpperCase()} mode`);
+    alpacaInstances[tradingMode] = new AlpacaClient(tradingMode);
   }
-  return alpacaInstance;
+
+  return alpacaInstances[tradingMode]!;
+}
+
+/**
+ * Reset Alpaca client instance for a specific mode
+ * Useful when credentials change or when switching modes
+ *
+ * @param mode - Trading mode to reset (optional, resets all if not specified)
+ */
+export function resetAlpacaClient(mode?: TradingMode): void {
+  if (mode) {
+    logger.info(`🔄 Resetting AlpacaClient instance for ${mode.toUpperCase()} mode`);
+    alpacaInstances[mode] = null;
+  } else {
+    logger.info('🔄 Resetting all AlpacaClient instances');
+    alpacaInstances.paper = null;
+    alpacaInstances.live = null;
+  }
 }

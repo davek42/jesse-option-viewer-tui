@@ -11,9 +11,11 @@ import { OptionChainViewScreen } from './screens/OptionChainViewScreen.js';
 import { SavedStrategiesScreen } from './screens/SavedStrategiesScreen.js';
 import { OptionChainScreen } from './screens/OptionChainScreen.js';
 import { HelpScreen } from './screens/HelpScreen.js';
+import { SettingsScreen } from './screens/SettingsScreen.js';
 import { TerminalSizeWarning } from './components/TerminalSizeWarning.js';
 import { StrategySelector } from './components/StrategySelector.js';
 import { SaveConfirmation } from './components/SaveConfirmation.js';
+import { ModeConfirmationDialog } from './components/ModeConfirmationDialog.js';
 import { getATMIndex } from './components/OptionChain.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
@@ -675,6 +677,34 @@ function GlobalInputHandler() {
           // Show help screen (global command)
           dispatch({ type: 'SET_SCREEN', payload: 'help' });
           dispatch({ type: 'SET_STATUS', payload: { message: 'Showing help screen', type: 'info' } });
+        } else if (command === '/settings' || command === '/config') {
+          // Show settings screen (Task #18)
+          dispatch({ type: 'SET_SCREEN', payload: 'settings' });
+          dispatch({ type: 'SET_STATUS', payload: { message: 'Showing settings screen', type: 'info' } });
+        } else if (command === '/paper') {
+          // Switch to paper mode (Task #18)
+          if (state.tradingMode === 'paper') {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Already in PAPER mode', type: 'info' } });
+          } else {
+            dispatch({ type: 'REQUEST_MODE_SWITCH', payload: 'paper' });
+          }
+        } else if (command === '/live') {
+          // Switch to live mode (Task #18)
+          if (!state.liveCredentialsConfigured) {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Live credentials not configured', type: 'error' } });
+          } else if (state.tradingMode === 'live') {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Already in LIVE mode', type: 'info' } });
+          } else {
+            dispatch({ type: 'REQUEST_MODE_SWITCH', payload: 'live' });
+          }
+        } else if (command === '/mode') {
+          // Toggle mode (Task #18)
+          const targetMode = state.tradingMode === 'paper' ? 'live' : 'paper';
+          if (targetMode === 'live' && !state.liveCredentialsConfigured) {
+            dispatch({ type: 'SET_STATUS', payload: { message: 'Live credentials not configured', type: 'error' } });
+          } else {
+            dispatch({ type: 'REQUEST_MODE_SWITCH', payload: targetMode });
+          }
         } else if (command.startsWith('/')) {
           dispatch({ type: 'SET_STATUS', payload: { message: `Unknown command: ${command}`, type: 'error' } });
         }
@@ -721,6 +751,20 @@ function GlobalInputHandler() {
     }
 
     // NAVIGATION MODE
+
+    // MODE CONFIRMATION DIALOG (Task #18) - Handle before other navigation
+    if (state.showModeConfirmation) {
+      if (input === 'Y' || input === 'y') {
+        dispatch({ type: 'CONFIRM_MODE_SWITCH' });
+        return;
+      } else if (input === 'N' || input === 'n' || key.escape) {
+        dispatch({ type: 'CANCEL_MODE_SWITCH' });
+        return;
+      }
+      // While confirmation dialog is showing, ignore all other inputs
+      return;
+    }
+
     // Slash command initiation
     if (input === '/') {
       dispatch({ type: 'SET_MODE', payload: 'command' });
@@ -739,6 +783,9 @@ function GlobalInputHandler() {
       if (input === 's') {
         dispatch({ type: 'SET_MODE', payload: 'input' });
         dispatch({ type: 'SET_STATUS', payload: { message: 'Enter stock symbol', type: 'info' } });
+      } else if (input === 'c') {
+        // Settings (Task #18)
+        dispatch({ type: 'SET_SCREEN', payload: 'settings' });
       } else if (input === 'q') {
         logger.info('👋 Exiting application...');
         exit();
@@ -1244,6 +1291,31 @@ function GlobalInputHandler() {
       }
     }
 
+    // Settings screen navigation (Task #18)
+    if (currentScreen === 'settings') {
+      if (input === 'q') {
+        // Go back
+        dispatch({ type: 'GO_BACK' });
+      } else if (input === 'm' || input === 'M') {
+        // Switch mode
+        const targetMode = state.tradingMode === 'paper' ? 'live' : 'paper';
+
+        // Check if switching to live but credentials not configured
+        if (targetMode === 'live' && !state.liveCredentialsConfigured) {
+          dispatch({
+            type: 'SET_STATUS',
+            payload: {
+              message: 'Live credentials not configured. Check .env.local file.',
+              type: 'error',
+            },
+          });
+        } else {
+          // Request mode switch (triggers confirmation dialog)
+          dispatch({ type: 'REQUEST_MODE_SWITCH', payload: targetMode });
+        }
+      }
+    }
+
     // Legacy optionChain screen navigation (kept for backward compatibility if needed)
     // This is now handled by symbolDetail + strategy builder modal
     /*
@@ -1466,7 +1538,7 @@ function AppContent() {
       <GlobalInputHandler />
 
       {/* Header */}
-      <Header compact />
+      <Header compact tradingMode={state.tradingMode} />
 
       {/* Terminal size warning */}
       <TerminalSizeWarning terminalSize={terminalSize} />
@@ -1504,6 +1576,17 @@ function AppContent() {
         {/* Save Confirmation Modal */}
         {state.currentScreen === 'symbolDetail' && state.strategyBuilderActive && state.showSaveConfirmation && state.strategyToSave && (
           <SaveConfirmation strategy={state.strategyToSave} />
+        )}
+
+        {/* Mode Confirmation Modal (Task #18) */}
+        {state.showModeConfirmation && state.pendingModeSwitch && (
+          <Box position="absolute" width="100%" height="100%" justifyContent="center" alignItems="center">
+            <ModeConfirmationDialog
+              currentMode={state.tradingMode}
+              targetMode={state.pendingModeSwitch}
+              validationWarnings={state.validationWarnings}
+            />
+          </Box>
         )}
 
         {/* Task #9: Strategy Builder Modal (show when strategy type is selected) */}
@@ -1551,6 +1634,9 @@ function AppContent() {
         {/* Help Screen */}
         {state.currentScreen === 'help' && <HelpScreen />}
 
+        {/* Settings Screen */}
+        {state.currentScreen === 'settings' && <SettingsScreen />}
+
       </Box>
 
       {/* Keyboard shortcuts help - Context-aware */}
@@ -1561,6 +1647,7 @@ function AppContent() {
             {state.currentScreen === 'home' && (
               <>
                 <Text bold color="cyan">s</Text> Symbol{' '}
+                <Text bold color="cyan">c</Text> Settings{' '}
                 <Text bold color="cyan">h/?</Text> Help{' '}
                 <Text bold color="cyan">q</Text> Quit
               </>
@@ -1611,6 +1698,14 @@ function AppContent() {
             {/* Help screen */}
             {state.currentScreen === 'help' && (
               <>
+                <Text bold color="cyan">q</Text> Back
+              </>
+            )}
+
+            {/* Settings screen */}
+            {state.currentScreen === 'settings' && (
+              <>
+                <Text bold color="cyan">m</Text> Switch Mode{' '}
                 <Text bold color="cyan">q</Text> Back
               </>
             )}

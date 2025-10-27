@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // AIDEV-NOTE: Main entry point for the Option Viewer TUI application
 
+// Load environment variables from .env.local (Task #18)
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import React from 'react';
 import { render } from 'ink';
 import { App } from './App.js';

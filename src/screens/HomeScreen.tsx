@@ -58,6 +58,26 @@ export function HomeScreen() {
         </Box>
       )}
 
+      {/* Safety notice (Task #18 Phase 5) */}
+      {state.liveCredentialsConfigured && (
+        <Box marginTop={1} flexDirection="column" borderStyle="single" borderColor="yellow" padding={1}>
+          <Text bold color="yellow">
+            🛡️  Safety Notice:
+          </Text>
+          <Box marginTop={1} flexDirection="column">
+            <Text dimColor>
+              • Live trading credentials are configured
+            </Text>
+            <Text dimColor>
+              • Currently in <Text bold color="green">PAPER</Text> mode (safe)
+            </Text>
+            <Text dimColor>
+              • Press <Text bold color="cyan">c</Text> to access settings and switch modes
+            </Text>
+          </Box>
+        </Box>
+      )}
+
       {/* Version footer */}
       <Box marginTop={2}>
         <Text dimColor>Jesse Option Viewer TUI v{VERSION}</Text>
