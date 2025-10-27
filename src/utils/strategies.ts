@@ -193,6 +193,176 @@ export function createBearPutSpread(
 }
 
 /**
+ * Calculate Bull Put Spread strategy metrics (Task #11)
+ *
+ * Bull Put Spread (Credit Spread):
+ * - SELL higher strike put (collect premium)
+ * - BUY lower strike put (protection)
+ * - Net credit received (max profit)
+ * - Limited risk, bullish strategy
+ */
+export function calculateBullPutSpread(
+  longPut: OptionContract,
+  shortPut: OptionContract,
+  quantity: number = 1
+): {
+  netCredit: number;
+  maxLoss: number;
+  maxGain: number;
+  breakEven: number;
+  profitPotential: number;
+  riskRewardRatio: number;
+} | null {
+  // Validation
+  if (longPut.optionType !== 'put' || shortPut.optionType !== 'put') {
+    return null;
+  }
+
+  if (shortPut.strikePrice <= longPut.strikePrice) {
+    return null; // Short strike must be higher than long strike
+  }
+
+  if (longPut.expirationDate !== shortPut.expirationDate) {
+    return null;
+  }
+
+  // Calculate costs (credit spread)
+  const shortCredit = shortPut.bid * quantity * 100; // We SELL the higher strike
+  const longCost = longPut.ask * quantity * 100;     // We BUY the lower strike
+
+  const netCredit = shortCredit - longCost; // Net credit received
+  const maxGain = netCredit;
+
+  const spreadWidth = shortPut.strikePrice - longPut.strikePrice;
+  const maxLoss = (spreadWidth * 100 * quantity) - netCredit;
+
+  const breakEven = shortPut.strikePrice - (netCredit / (100 * quantity));
+
+  const profitPotential = maxLoss > 0 ? (maxGain / maxLoss) * 100 : 0;
+  const riskRewardRatio = maxLoss > 0 ? maxGain / maxLoss : 0;
+
+  return {
+    netCredit,
+    maxLoss,
+    maxGain,
+    breakEven,
+    profitPotential,
+    riskRewardRatio,
+  };
+}
+
+/**
+ * Create a Bull Put Spread strategy object
+ */
+export function createBullPutSpread(
+  symbol: string,
+  longPut: OptionContract,
+  shortPut: OptionContract,
+  quantity: number = 1
+): OptionStrategy | null {
+  const metrics = calculateBullPutSpread(longPut, shortPut, quantity);
+  if (!metrics) return null;
+
+  const id = `bull-put-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  return {
+    id,
+    type: 'bull_put_spread',
+    symbol,
+    legs: [longPut, shortPut],
+    maxLoss: metrics.maxLoss,
+    maxGain: metrics.maxGain,
+    breakEvenPrices: [metrics.breakEven],
+    createdAt: new Date(),
+  };
+}
+
+/**
+ * Calculate Bear Call Spread strategy metrics (Task #12)
+ *
+ * Bear Call Spread (Credit Spread):
+ * - SELL lower strike call (collect premium)
+ * - BUY higher strike call (protection)
+ * - Net credit received (max profit)
+ * - Limited risk, bearish strategy
+ */
+export function calculateBearCallSpread(
+  longCall: OptionContract,
+  shortCall: OptionContract,
+  quantity: number = 1
+): {
+  netCredit: number;
+  maxLoss: number;
+  maxGain: number;
+  breakEven: number;
+  profitPotential: number;
+  riskRewardRatio: number;
+} | null {
+  // Validation
+  if (longCall.optionType !== 'call' || shortCall.optionType !== 'call') {
+    return null;
+  }
+
+  if (longCall.strikePrice <= shortCall.strikePrice) {
+    return null; // Long strike must be higher than short strike
+  }
+
+  if (longCall.expirationDate !== shortCall.expirationDate) {
+    return null;
+  }
+
+  // Calculate costs (credit spread)
+  const shortCredit = shortCall.bid * quantity * 100; // We SELL the lower strike
+  const longCost = longCall.ask * quantity * 100;     // We BUY the higher strike
+
+  const netCredit = shortCredit - longCost; // Net credit received
+  const maxGain = netCredit;
+
+  const spreadWidth = longCall.strikePrice - shortCall.strikePrice;
+  const maxLoss = (spreadWidth * 100 * quantity) - netCredit;
+
+  const breakEven = shortCall.strikePrice + (netCredit / (100 * quantity));
+
+  const profitPotential = maxLoss > 0 ? (maxGain / maxLoss) * 100 : 0;
+  const riskRewardRatio = maxLoss > 0 ? maxGain / maxLoss : 0;
+
+  return {
+    netCredit,
+    maxLoss,
+    maxGain,
+    breakEven,
+    profitPotential,
+    riskRewardRatio,
+  };
+}
+
+/**
+ * Create a Bear Call Spread strategy object
+ */
+export function createBearCallSpread(
+  symbol: string,
+  longCall: OptionContract,
+  shortCall: OptionContract,
+  quantity: number = 1
+): OptionStrategy | null {
+  const metrics = calculateBearCallSpread(longCall, shortCall, quantity);
+  if (!metrics) return null;
+
+  const id = `bear-call-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  return {
+    id,
+    type: 'bear_call_spread',
+    symbol,
+    legs: [longCall, shortCall],
+    maxLoss: metrics.maxLoss,
+    maxGain: metrics.maxGain,
+    breakEvenPrices: [metrics.breakEven],
+    createdAt: new Date(),
+  };
+}
+
+/**
  * Calculate Long Straddle strategy metrics (Task #9)
  *
  * Long Straddle:

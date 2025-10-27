@@ -21,6 +21,8 @@ import { useTerminalSize, calculateSafeDisplayLimit } from './hooks/useTerminalS
 import {
   createBullCallSpread,
   createBearPutSpread,
+  createBullPutSpread,
+  createBearCallSpread,
   createLongStraddle,
   createIronCondor,
   createCoveredCall,
@@ -85,6 +87,10 @@ function shouldCenterOnATM(strategyType: StrategyType, step: string): boolean {
       return step === 'leg1'; // leg1 shows all calls
     case 'bear_put_spread':
       return step === 'leg1'; // leg1 shows all puts
+    case 'bull_put_spread':
+      return step === 'leg1'; // leg1 shows all puts (buy lower strike)
+    case 'bear_call_spread':
+      return step === 'leg1'; // leg1 shows all calls (buy higher strike)
     case 'long_straddle':
       return step === 'leg1'; // leg1 shows all calls
     case 'iron_condor':
@@ -170,6 +176,18 @@ function getAvailableOptionsForStep(
         ? puts
         : puts.filter(p => selectedLegs[0] ? p.strikePrice < selectedLegs[0].strikePrice : true);
 
+    case 'bull_put_spread':
+      // Credit spread: Step 1 (leg1): All puts (buy lower) | Step 2 (leg2): Higher strike puts (sell)
+      return step === 'leg1'
+        ? puts
+        : puts.filter(p => selectedLegs[0] ? p.strikePrice > selectedLegs[0].strikePrice : true);
+
+    case 'bear_call_spread':
+      // Credit spread: Step 1 (leg1): All calls (buy higher) | Step 2 (leg2): Lower strike calls (sell)
+      return step === 'leg1'
+        ? calls
+        : calls.filter(c => selectedLegs[0] ? c.strikePrice < selectedLegs[0].strikePrice : true);
+
     case 'long_straddle':
       // Step 1 (leg1): All calls | Step 2 (leg2): Puts with same strike as selected call
       if (step === 'leg1') {
@@ -229,6 +247,12 @@ function isStrategyComplete(
     case 'bear_put_spread':
       return selectedLegs.length === 2;
 
+    case 'bull_put_spread':
+      return selectedLegs.length === 2;
+
+    case 'bear_call_spread':
+      return selectedLegs.length === 2;
+
     case 'long_straddle':
       return selectedLegs.length === 2;
 
@@ -271,6 +295,20 @@ function createStrategyByType(
       const [longPut, shortPut] = selectedLegs;
       return longPut && shortPut
         ? createBearPutSpread(symbol, longPut, shortPut, 1)
+        : null;
+    }
+
+    case 'bull_put_spread': {
+      const [longPut, shortPut] = selectedLegs;
+      return longPut && shortPut
+        ? createBullPutSpread(symbol, longPut, shortPut, 1)
+        : null;
+    }
+
+    case 'bear_call_spread': {
+      const [longCall, shortCall] = selectedLegs;
+      return longCall && shortCall
+        ? createBearCallSpread(symbol, longCall, shortCall, 1)
         : null;
     }
 
@@ -317,6 +355,12 @@ function getInitialStrategyMessage(strategyType: StrategyType): string {
     case 'bear_put_spread':
       return 'Select LONG PUT (Buy) - Choose higher strike put';
 
+    case 'bull_put_spread':
+      return 'Select LONG PUT (Buy) - Choose lower strike put for protection';
+
+    case 'bear_call_spread':
+      return 'Select LONG CALL (Buy) - Choose higher strike call for protection';
+
     case 'long_straddle':
       return 'Select ATM CALL (Buy) - Choose at-the-money strike';
 
@@ -352,6 +396,18 @@ function getSelectionStatusMessage(
         return `✓ LONG PUT (Buy) at ${strike} selected. Now select SHORT PUT (Sell - lower strike)`;
       }
       return `✓ SHORT PUT (Sell) at ${strike} selected. Press Enter to SAVE strategy`;
+
+    case 'bull_put_spread':
+      if (legNumber === 1) {
+        return `✓ LONG PUT (Buy) at ${strike} selected. Now select SHORT PUT (Sell - higher strike for credit)`;
+      }
+      return `✓ SHORT PUT (Sell) at ${strike} selected. Press Enter to SAVE strategy`;
+
+    case 'bear_call_spread':
+      if (legNumber === 1) {
+        return `✓ LONG CALL (Buy) at ${strike} selected. Now select SHORT CALL (Sell - lower strike for credit)`;
+      }
+      return `✓ SHORT CALL (Sell) at ${strike} selected. Press Enter to SAVE strategy`;
 
     case 'long_straddle':
       if (legNumber === 1) {
@@ -508,6 +564,8 @@ function getLegCountForStrategy(strategyType: StrategyType): number {
     case 'bull_call_spread':
     case 'diagonal_call_spread':
     case 'bear_put_spread':
+    case 'bull_put_spread':
+    case 'bear_call_spread':
     case 'long_straddle':
       return 2;
     case 'iron_condor':

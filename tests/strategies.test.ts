@@ -4,12 +4,16 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateBullCallSpread,
   calculateBearPutSpread,
+  calculateBullPutSpread,
+  calculateBearCallSpread,
   calculateLongStraddle,
   calculateIronCondor,
   calculateCoveredCall,
   calculateDiagonalCallSpread,
   createBullCallSpread,
   createBearPutSpread,
+  createBullPutSpread,
+  createBearCallSpread,
   createLongStraddle,
   createIronCondor,
   createCoveredCall,
@@ -24,6 +28,8 @@ import {
   createMockOption,
   createBullCallSpreadPair,
   createBearPutSpreadPair,
+  createBullPutSpreadPair,
+  createBearCallSpreadPair,
   createStraddlePair,
   createIronCondorLegs,
   createDiagonalCallSpreadPair,
@@ -255,6 +261,228 @@ describe('calculateBearPutSpread', () => {
       const result = calculateBearPutSpread(longPut, shortPut, 1);
       expect(result).toBeNull();
     });
+  });
+});
+
+describe('calculateBullPutSpread', () => {
+  describe('Valid spreads', () => {
+    it('should calculate correct net credit (sell high, buy low)', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      expect(result).not.toBeNull();
+      expect(result?.netCredit).toBe(150); // (3.0 - 1.5) * 100
+    });
+
+    it('should calculate correct max gain (net credit)', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      expect(result?.maxGain).toBe(150); // Net credit is max profit
+    });
+
+    it('should calculate correct max loss', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      // Max loss = (spread width * 100) - net credit
+      // = (100 - 95) * 100 - 150 = 500 - 150 = 350
+      expect(result?.maxLoss).toBe(350);
+    });
+
+    it('should calculate correct breakeven', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      // Breakeven = short strike - (net credit / 100)
+      // = 100 - (150 / 100) = 100 - 1.5 = 98.5
+      expect(result?.breakEven).toBe(98.5);
+    });
+
+    it('should handle multiple contracts', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+      const result = calculateBullPutSpread(longPut, shortPut, 2);
+
+      expect(result?.netCredit).toBe(300); // 150 * 2
+      expect(result?.maxGain).toBe(300);
+      expect(result?.maxLoss).toBe(700); // 350 * 2
+    });
+
+    it('should calculate profit potential percentage', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      // Profit potential = (maxGain / maxLoss) * 100
+      // = (150 / 350) * 100 = 42.86%
+      expect(result?.profitPotential).toBeCloseTo(42.86, 1);
+    });
+
+    it('should calculate risk/reward ratio', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      // Risk/reward = maxGain / maxLoss = 150 / 350 = 0.43
+      expect(result?.riskRewardRatio).toBeCloseTo(0.43, 2);
+    });
+  });
+
+  describe('Invalid spreads', () => {
+    it('should return null for wrong option types', () => {
+      const [longCall, shortCall] = createBullCallSpreadPair();
+      const result = calculateBullPutSpread(longCall as any, shortCall as any, 1);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for incorrect strike order (short <= long)', () => {
+      const [longPut, shortPut] = createBullPutSpreadPair(100, 95, 3.0, 1.5); // Reversed
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for different expiration dates', () => {
+      const longPut = createMockOption({ strikePrice: 95, optionType: 'put', expirationDate: '2025-10-24' });
+      const shortPut = createMockOption({ strikePrice: 100, optionType: 'put', expirationDate: '2025-11-21' });
+      const result = calculateBullPutSpread(longPut, shortPut, 1);
+
+      expect(result).toBeNull();
+    });
+  });
+});
+
+describe('calculateBearCallSpread', () => {
+  describe('Valid spreads', () => {
+    it('should calculate correct net credit (sell low, buy high)', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      expect(result).not.toBeNull();
+      expect(result?.netCredit).toBe(150); // (3.0 - 1.5) * 100
+    });
+
+    it('should calculate correct max gain (net credit)', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      expect(result?.maxGain).toBe(150); // Net credit is max profit
+    });
+
+    it('should calculate correct max loss', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      // Max loss = (spread width * 100) - net credit
+      // = (110 - 105) * 100 - 150 = 500 - 150 = 350
+      expect(result?.maxLoss).toBe(350);
+    });
+
+    it('should calculate correct breakeven', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      // Breakeven = short strike + (net credit / 100)
+      // = 105 + (150 / 100) = 105 + 1.5 = 106.5
+      expect(result?.breakEven).toBe(106.5);
+    });
+
+    it('should handle multiple contracts', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+      const result = calculateBearCallSpread(longCall, shortCall, 2);
+
+      expect(result?.netCredit).toBe(300); // 150 * 2
+      expect(result?.maxGain).toBe(300);
+      expect(result?.maxLoss).toBe(700); // 350 * 2
+    });
+
+    it('should calculate profit potential percentage', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      // Profit potential = (maxGain / maxLoss) * 100
+      // = (150 / 350) * 100 = 42.86%
+      expect(result?.profitPotential).toBeCloseTo(42.86, 1);
+    });
+
+    it('should calculate risk/reward ratio', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      // Risk/reward = maxGain / maxLoss = 150 / 350 = 0.43
+      expect(result?.riskRewardRatio).toBeCloseTo(0.43, 2);
+    });
+  });
+
+  describe('Invalid spreads', () => {
+    it('should return null for wrong option types', () => {
+      const [longPut, shortPut] = createBearPutSpreadPair();
+      const result = calculateBearCallSpread(longPut as any, shortPut as any, 1);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for incorrect strike order (long <= short)', () => {
+      const [longCall, shortCall] = createBearCallSpreadPair(110, 105, 1.5, 3.0); // Reversed
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for different expiration dates', () => {
+      const longCall = createMockOption({ strikePrice: 110, optionType: 'call', expirationDate: '2025-11-21' });
+      const shortCall = createMockOption({ strikePrice: 105, optionType: 'call', expirationDate: '2025-10-24' });
+      const result = calculateBearCallSpread(longCall, shortCall, 1);
+
+      expect(result).toBeNull();
+    });
+  });
+});
+
+describe('createBullPutSpread', () => {
+  it('should create a valid strategy object', () => {
+    const [longPut, shortPut] = createBullPutSpreadPair(95, 100, 1.5, 3.0);
+    const strategy = createBullPutSpread('SPY', longPut, shortPut, 1);
+
+    expect(strategy).not.toBeNull();
+    expect(strategy?.type).toBe('bull_put_spread');
+    expect(strategy?.symbol).toBe('SPY');
+    expect(strategy?.legs).toHaveLength(2);
+    expect(strategy?.maxGain).toBe(150);
+    expect(strategy?.maxLoss).toBe(350);
+    expect(strategy?.breakEvenPrices).toHaveLength(1);
+    expect(strategy?.breakEvenPrices[0]).toBe(98.5);
+  });
+
+  it('should return null for invalid spreads', () => {
+    const longPut = createMockOption({ strikePrice: 100, optionType: 'put' });
+    const shortPut = createMockOption({ strikePrice: 95, optionType: 'put' });
+    const strategy = createBullPutSpread('SPY', longPut, shortPut, 1);
+
+    expect(strategy).toBeNull();
+  });
+});
+
+describe('createBearCallSpread', () => {
+  it('should create a valid strategy object', () => {
+    const [longCall, shortCall] = createBearCallSpreadPair(105, 110, 3.0, 1.5);
+    const strategy = createBearCallSpread('SPY', longCall, shortCall, 1);
+
+    expect(strategy).not.toBeNull();
+    expect(strategy?.type).toBe('bear_call_spread');
+    expect(strategy?.symbol).toBe('SPY');
+    expect(strategy?.legs).toHaveLength(2);
+    expect(strategy?.maxGain).toBe(150);
+    expect(strategy?.maxLoss).toBe(350);
+    expect(strategy?.breakEvenPrices).toHaveLength(1);
+    expect(strategy?.breakEvenPrices[0]).toBe(106.5);
+  });
+
+  it('should return null for invalid spreads', () => {
+    const longCall = createMockOption({ strikePrice: 105, optionType: 'call' });
+    const shortCall = createMockOption({ strikePrice: 110, optionType: 'call' });
+    const strategy = createBearCallSpread('SPY', longCall, shortCall, 1);
+
+    expect(strategy).toBeNull();
   });
 });
 

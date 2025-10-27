@@ -144,6 +144,68 @@ export function createStraddlePair(
 }
 
 /**
+ * Create a pair of options for a bull put spread (credit spread)
+ *
+ * @param longStrike - Strike price for the long put (lower - protection)
+ * @param shortStrike - Strike price for the short put (higher - sell for credit)
+ * @param longAsk - Ask price for the long put
+ * @param shortBid - Bid price for the short put
+ * @returns Tuple of [longPut, shortPut]
+ */
+export function createBullPutSpreadPair(
+  longStrike: number = 95,
+  shortStrike: number = 100,
+  longAsk: number = 1.5,
+  shortBid: number = 3.0
+): [OptionContract, OptionContract] {
+  return [
+    createMockOption({
+      strikePrice: longStrike,
+      ask: longAsk,
+      optionType: 'put',
+      expirationDate: '2025-10-24',
+    }),
+    createMockOption({
+      strikePrice: shortStrike,
+      bid: shortBid,
+      optionType: 'put',
+      expirationDate: '2025-10-24',
+    }),
+  ];
+}
+
+/**
+ * Create a pair of options for a bear call spread (credit spread)
+ *
+ * @param shortStrike - Strike price for the short call (lower - sell for credit)
+ * @param longStrike - Strike price for the long call (higher - protection)
+ * @param shortBid - Bid price for the short call
+ * @param longAsk - Ask price for the long call
+ * @returns Tuple of [longCall, shortCall]
+ */
+export function createBearCallSpreadPair(
+  shortStrike: number = 105,
+  longStrike: number = 110,
+  shortBid: number = 3.0,
+  longAsk: number = 1.5
+): [OptionContract, OptionContract] {
+  return [
+    createMockOption({
+      strikePrice: longStrike,
+      ask: longAsk,
+      optionType: 'call',
+      expirationDate: '2025-10-24',
+    }),
+    createMockOption({
+      strikePrice: shortStrike,
+      bid: shortBid,
+      optionType: 'call',
+      expirationDate: '2025-10-24',
+    }),
+  ];
+}
+
+/**
  * Create a pair of options for a diagonal call spread
  *
  * @param longStrike - Strike price for the long call (lower)
