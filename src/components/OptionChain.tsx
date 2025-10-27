@@ -23,6 +23,42 @@ interface OptionChainProps {
 }
 
 /**
+ * Format expiration date for display
+ */
+function formatExpirationDate(dateStr: string): string {
+  // Parse date string manually to avoid timezone issues
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const year = parseInt(yearStr!, 10);
+  const month = parseInt(monthStr!, 10) - 1; // Month is 0-indexed
+  const day = parseInt(dayStr!, 10);
+
+  // Create date in local timezone (not UTC)
+  const date = new Date(year, month, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Calculate days until expiration
+  const diffTime = date.getTime() - today.getTime();
+  const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  // Format date
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthName = monthNames[month];
+
+  // Add DTE (Days to Expiration) suffix
+  let dteLabel = '';
+  if (daysUntil === 0) {
+    dteLabel = ' (0 DTE - Expires Today)';
+  } else if (daysUntil === 1) {
+    dteLabel = ' (1 DTE)';
+  } else {
+    dteLabel = ` (${daysUntil} DTE)`;
+  }
+
+  return `${monthName} ${day}, ${year}${dteLabel}`;
+}
+
+/**
  * Find the at-the-money (ATM) strike closest to current stock price
  */
 function findATMStrike(calls: OptionContract[], puts: OptionContract[], stockPrice: number): number {
@@ -395,7 +431,10 @@ export function OptionChain({
       {/* Footer info */}
       <Box marginTop={1} flexDirection="column">
         <Text dimColor>
-          ATM Strike: ${safeToFixed(atmStrike, 2)} ● | Total Calls: {calls.length} | Total Puts: {puts.length}
+          📅 Expiration: <Text bold color="cyan">{formatExpirationDate(optionChain.expirationDate)}</Text>
+        </Text>
+        <Text dimColor>
+          ATM Strike: ${safeToFixed(atmStrike, 2)} ● Total Calls: {calls.length} ● Total Puts: {puts.length}
         </Text>
         {!showGreeks && (
           <Text dimColor>
