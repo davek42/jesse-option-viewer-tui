@@ -228,6 +228,32 @@ export function StrategyBuilder({
       return { availableOptions: filtered, optionType: 'put' as const };
     }
 
+    // For bull_put_spread (credit spread)
+    if (strategyType === 'bull_put_spread') {
+      if (selectionStep === 'leg1') {
+        // leg1: buy lower strike put (protection) - show all puts
+        return { availableOptions: puts, optionType: 'put' as const };
+      }
+      // leg2: sell higher strike put (for credit - must be higher than leg1)
+      const longPut = selectedLegs[0];
+      const filtered = longPut ? puts.filter(p => p.strikePrice > longPut.strikePrice) : puts;
+      logger.debug(`🔍 BUILDER FILTER: bull_put_spread leg2 - longPut strike=${longPut?.strikePrice}, filtered=${filtered.length} puts (from ${puts.length} total)`);
+      return { availableOptions: filtered, optionType: 'put' as const };
+    }
+
+    // For bear_call_spread (credit spread)
+    if (strategyType === 'bear_call_spread') {
+      if (selectionStep === 'leg1') {
+        // leg1: buy higher strike call (protection) - show all calls
+        return { availableOptions: calls, optionType: 'call' as const };
+      }
+      // leg2: sell lower strike call (for credit - must be lower than leg1)
+      const longCall = selectedLegs[0];
+      const filtered = longCall ? calls.filter(c => c.strikePrice < longCall.strikePrice) : calls;
+      logger.debug(`🔍 BUILDER FILTER: bear_call_spread leg2 - longCall strike=${longCall?.strikePrice}, filtered=${filtered.length} calls (from ${calls.length} total)`);
+      return { availableOptions: filtered, optionType: 'call' as const };
+    }
+
     // For long_straddle
     if (strategyType === 'long_straddle') {
       logger.debug(`🔍 BUILDER FILTER: long_straddle - selectionStep=${selectionStep}, selectedLegs.length=${selectedLegs.length}`);
