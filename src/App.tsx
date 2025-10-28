@@ -1506,6 +1506,10 @@ function GlobalInputHandler() {
           logger.debug(`📅 App.tsx: Dispatching SET_AVAILABLE_EXPIRATIONS with ${expirations.dates.length} dates: ${expirations.dates.join(', ')}`);
           dispatch({ type: 'SET_AVAILABLE_EXPIRATIONS', payload: expirations.dates });
           dispatch({ type: 'SET_STATUS', payload: { message: `✅ Loaded ${expirations.dates.length} expiration dates`, type: 'success' } });
+
+          // Clear screen before switching to symbol detail screen
+          process.stdout.write('\x1Bc');
+
           // Switch to symbol detail screen
           dispatch({ type: 'SET_SCREEN', payload: 'symbolDetail' });
         }

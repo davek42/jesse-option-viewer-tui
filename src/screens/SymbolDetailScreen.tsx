@@ -1,4 +1,5 @@
 // AIDEV-NOTE: Symbol detail screen - Hub for stock info and navigation to other screens
+// AIDEV-NOTE: Responsive UI - adapts to terminal size (compact mode below 40 lines)
 
 import React from 'react';
 import { Box, Text } from 'ink';
@@ -24,6 +25,10 @@ interface SymbolDetailScreenProps {
  * - Option Chain View (press 'o')
  * - Strategy Builder (press 'b')
  * - Saved Strategies (press 'v')
+ *
+ * Responsive UI:
+ * - Terminal height >= 40 lines: Full UI with borders and all sections
+ * - Terminal height < 40 lines: Compact mode - simplified UI to fit small screens
  */
 export function SymbolDetailScreen({
   highlightedIndex = 0,
@@ -40,6 +45,49 @@ export function SymbolDetailScreen({
     loading,
     error,
   } = state;
+
+  // Detect terminal size and determine UI mode
+  const terminalHeight = process.stdout.rows || 30;
+  const COMPACT_MODE_THRESHOLD = 40;
+  const compactMode = terminalHeight < COMPACT_MODE_THRESHOLD;
+
+  // Calculate dynamic maxVisible for expiration list based on available space
+  const getMaxVisibleExpirations = (): number => {
+    if (compactMode) {
+      // Compact mode: Account for ALL UI elements including App.tsx chrome
+      // Header (App.tsx): 2 lines
+      // Stock quote: 1 line
+      // Expiration header: 2 lines
+      // Scroll indicators: 2 lines
+      // Strategies (if any): 3 lines (single line + border)
+      // Keyboard shortcuts (App.tsx): 2 lines
+      // StatusBar (App.tsx): 2 lines
+      // Margins/padding: 2 lines
+      // Total reserved: ~16 lines
+      // For 30-line terminal: Keep it very tight at 7 expirations
+      return 7; // Fixed at 7 for small terminals to ensure it fits
+    } else {
+      // Full mode: Account for ALL UI elements including App.tsx chrome
+      // Header (App.tsx): 2 lines
+      // Stock quote: 3 lines
+      // Expiration header: 2 lines
+      // Scroll indicators: 2 lines
+      // Strategies: 7 lines
+      // Keyboard shortcuts (App.tsx): 2 lines
+      // StatusBar (App.tsx): 2 lines
+      // Margins/padding: 2 lines
+      // Total reserved: ~22 lines
+      const reservedLines = 22;
+      const availableForExpirations = Math.max(8, terminalHeight - reservedLines);
+      return Math.min(15, availableForExpirations);
+    }
+  };
+
+  const maxVisible = getMaxVisibleExpirations();
+
+  logger.debug(
+    `📏 Terminal: ${terminalHeight} lines, Mode: ${compactMode ? 'COMPACT' : 'FULL'}, MaxVisible: ${maxVisible}`
+  );
 
   /**
    * Handle expiration date selection
@@ -119,119 +167,146 @@ export function SymbolDetailScreen({
 
   return (
     <Box flexDirection="column" paddingY={1}>
-      {/* Stock quote banner */}
+      {/* Stock quote banner - Compact or Full mode */}
       {stockQuote && (
-        <Box paddingX={1} marginBottom={1} borderStyle="round" borderColor="cyan">
-          <Box>
-            <Text bold color="cyan">
-              {stockQuote.symbol}
-            </Text>
-            <Text> @ </Text>
-            <Text bold color="white">
-              ${safeToFixed(stockQuote.price, 2)}
-            </Text>
-          </Box>
-          <Box marginLeft={2}>
-            <Text color={stockQuote.change >= 0 ? 'green' : 'red'}>
-              {stockQuote.change >= 0 ? '▲' : '▼'} {safeToFixed(stockQuote.change, 2)} (
-              {safeToFixed(stockQuote.changePercent, 2)}%)
-            </Text>
-          </Box>
-          <Box marginLeft={2}>
-            <Text dimColor>Vol: {stockQuote.volume.toLocaleString()}</Text>
-          </Box>
-        </Box>
+        <>
+          {compactMode ? (
+            // Compact mode: Single line without border
+            <Box paddingX={1} marginBottom={1}>
+              <Text bold color="cyan">
+                {stockQuote.symbol}
+              </Text>
+              <Text> @ </Text>
+              <Text bold color="white">
+                ${safeToFixed(stockQuote.price, 2)}
+              </Text>
+              <Text> </Text>
+              <Text color={stockQuote.change >= 0 ? 'green' : 'red'}>
+                {stockQuote.change >= 0 ? '▲' : '▼'} {safeToFixed(stockQuote.change, 2)} (
+                {safeToFixed(stockQuote.changePercent, 2)}%)
+              </Text>
+              <Text dimColor> Vol: {stockQuote.volume.toLocaleString()}</Text>
+            </Box>
+          ) : (
+            // Full mode: Multi-line with border
+            <Box paddingX={1} marginBottom={1} borderStyle="round" borderColor="cyan">
+              <Box>
+                <Text bold color="cyan">
+                  {stockQuote.symbol}
+                </Text>
+                <Text> @ </Text>
+                <Text bold color="white">
+                  ${safeToFixed(stockQuote.price, 2)}
+                </Text>
+              </Box>
+              <Box marginLeft={2}>
+                <Text color={stockQuote.change >= 0 ? 'green' : 'red'}>
+                  {stockQuote.change >= 0 ? '▲' : '▼'} {safeToFixed(stockQuote.change, 2)} (
+                  {safeToFixed(stockQuote.changePercent, 2)}%)
+                </Text>
+              </Box>
+              <Box marginLeft={2}>
+                <Text dimColor>Vol: {stockQuote.volume.toLocaleString()}</Text>
+              </Box>
+            </Box>
+          )}
+        </>
       )}
 
-      {/* Expiration selector */}
+      {/* Expiration selector - Dynamic sizing */}
       {availableExpirations.length > 0 && (
-        <Box marginBottom={2}>
+        <Box marginBottom={compactMode ? 1 : 2}>
           <ExpirationSelect
             expirations={availableExpirations}
             selectedExpiration={selectedExpiration}
             onSelect={handleExpirationSelect}
             highlightedIndex={highlightedIndex}
             isFocused={true}
-            maxVisible={15}
+            maxVisible={maxVisible}
           />
         </Box>
       )}
 
-      {/* Saved strategies summary */}
-      <Box
-        flexDirection="column"
-        paddingX={1}
-        marginBottom={2}
-        borderStyle="round"
-        borderColor="yellow"
-      >
-        <Box marginBottom={1}>
-          <Text bold color="yellow">
-            💼 Saved Strategies
-          </Text>
-          {savedStrategies.length > 0 && (
-            <Text dimColor> ({savedStrategies.length} active)</Text>
+      {/* Saved strategies summary - Hidden in compact mode if empty */}
+      {(!compactMode || savedStrategies.length > 0) && (
+        <Box
+          flexDirection="column"
+          paddingX={1}
+          marginBottom={compactMode ? 0 : 2}
+          borderStyle={compactMode ? 'single' : 'round'}
+          borderColor="yellow"
+        >
+          {compactMode ? (
+            // Compact mode: Single line with everything
+            <Box>
+              <Text bold color="yellow">
+                💼 Strategies
+              </Text>
+              {savedStrategies.length > 0 ? (
+                <>
+                  <Text dimColor> ({savedStrategies.length}) - Risk: </Text>
+                  <Text color="red">
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format(-savedStrategies.reduce((sum, s) => sum + Math.abs(s.maxLoss), 0))}
+                  </Text>
+                  <Text dimColor> | Gain: </Text>
+                  <Text color="green">
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format(savedStrategies.reduce((sum, s) => sum + s.maxGain, 0))}
+                  </Text>
+                </>
+              ) : (
+                <Text dimColor> - None saved</Text>
+              )}
+            </Box>
+          ) : (
+            // Full mode: Multi-line layout
+            <>
+              <Box marginBottom={1}>
+                <Text bold color="yellow">
+                  💼 Strategies
+                </Text>
+                {savedStrategies.length > 0 && (
+                  <Text dimColor> ({savedStrategies.length})</Text>
+                )}
+              </Box>
+
+              {savedStrategies.length === 0 ? (
+                <Text dimColor>None saved</Text>
+              ) : (
+                <Box flexDirection="column">
+                  <Box>
+                    <Text dimColor>Risk: </Text>
+                    <Text color="red">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'USD',
+                      }).format(-savedStrategies.reduce((sum, s) => sum + Math.abs(s.maxLoss), 0))}
+                    </Text>
+                    <Text dimColor> | Gain: </Text>
+                    <Text color="green">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'USD',
+                      }).format(savedStrategies.reduce((sum, s) => sum + s.maxGain, 0))}
+                    </Text>
+                  </Box>
+                  <Box marginTop={1}>
+                    <Text dimColor>
+                      Press <Text bold color="cyan">v</Text> to view all
+                    </Text>
+                  </Box>
+                </Box>
+              )}
+            </>
           )}
         </Box>
+      )}
 
-        {savedStrategies.length === 0 ? (
-          <Text dimColor>No strategies saved yet.</Text>
-        ) : (
-          <Box flexDirection="column">
-            <Box>
-              <Text dimColor>Total Risk: </Text>
-              <Text color="red">
-                {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'USD',
-                }).format(-savedStrategies.reduce((sum, s) => sum + Math.abs(s.maxLoss), 0))}
-              </Text>
-            </Box>
-            <Box>
-              <Text dimColor>Potential Gain: </Text>
-              <Text color="green">
-                {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'USD',
-                }).format(savedStrategies.reduce((sum, s) => sum + s.maxGain, 0))}
-              </Text>
-            </Box>
-            <Box marginTop={1}>
-              <Text dimColor>
-                Press <Text bold color="cyan">v</Text> to view all strategies
-              </Text>
-            </Box>
-          </Box>
-        )}
-      </Box>
-
-      {/* Quick actions */}
-      <Box flexDirection="column" paddingX={1} borderStyle="single" borderColor="green">
-        <Box marginBottom={1}>
-          <Text bold color="green">
-            📋 Quick Actions
-          </Text>
-        </Box>
-
-        <Box flexDirection="column">
-          <Text>
-            <Text bold color="cyan">o</Text> <Text dimColor>View Full Option Chain</Text>
-          </Text>
-          <Text>
-            <Text bold color="cyan">b</Text> <Text dimColor>Build New Strategy</Text>
-            {!selectedExpiration && <Text color="yellow"> (select expiration first)</Text>}
-          </Text>
-          <Text>
-            <Text bold color="cyan">v</Text> <Text dimColor>View Saved Strategies</Text>
-          </Text>
-          <Text>
-            <Text bold color="cyan">s</Text> <Text dimColor>Change Symbol</Text>
-          </Text>
-          <Text>
-            <Text bold color="cyan">q</Text> <Text dimColor>Back to Home</Text>
-          </Text>
-        </Box>
-      </Box>
 
       {/* Loading indicator for background operations */}
       {loading && stockQuote && (
