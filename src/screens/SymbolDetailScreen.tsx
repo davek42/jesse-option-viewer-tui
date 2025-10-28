@@ -152,7 +152,7 @@ export function SymbolDetailScreen({
             onSelect={handleExpirationSelect}
             highlightedIndex={highlightedIndex}
             isFocused={true}
-            maxVisible={6}
+            maxVisible={15}
           />
         </Box>
       )}

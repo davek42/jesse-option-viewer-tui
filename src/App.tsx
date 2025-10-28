@@ -1063,6 +1063,17 @@ function GlobalInputHandler() {
         const maxIndex = availableExpirations.length - 1;
         setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
       }
+      // 'K' - Jump up 10 items (Phase 2)
+      else if (input === 'K') {
+        setHighlightedIndex((prev) => Math.max(0, prev - 10));
+        dispatch({ type: 'SET_STATUS', payload: { message: '⬆️  Jumped up 10 expirations', type: 'info' } });
+      }
+      // 'J' - Jump down 10 items (Phase 2)
+      else if (input === 'J') {
+        const maxIndex = availableExpirations.length - 1;
+        setHighlightedIndex((prev) => Math.min(maxIndex, prev + 10));
+        dispatch({ type: 'SET_STATUS', payload: { message: '⬇️  Jumped down 10 expirations', type: 'info' } });
+      }
 
       // Select expiration and load option chain
       else if (key.return) {
@@ -1477,11 +1488,24 @@ function GlobalInputHandler() {
         dispatch({ type: 'SET_STOCK_QUOTE', payload: quote });
         dispatch({ type: 'SET_STATUS', payload: { message: `✓ Quote loaded for ${symbol}`, type: 'success' } });
 
-        // Fetch expiration dates
-        const expirations = await client.getExpirationDates(symbol);
+        // Fetch expiration dates with progress updates
+        dispatch({ type: 'SET_STATUS', payload: { message: `📅 Loading expiration dates...`, type: 'info' } });
+
+        const expirations = await client.getExpirationDates(symbol, (batchNum, totalDates, maxBatches) => {
+          // Update status bar with progress
+          dispatch({
+            type: 'SET_STATUS',
+            payload: {
+              message: `📅 Loading dates... batch ${batchNum}/${maxBatches} - ${totalDates} found`,
+              type: 'info',
+            },
+          });
+        });
+
         if (expirations) {
           logger.debug(`📅 App.tsx: Dispatching SET_AVAILABLE_EXPIRATIONS with ${expirations.dates.length} dates: ${expirations.dates.join(', ')}`);
           dispatch({ type: 'SET_AVAILABLE_EXPIRATIONS', payload: expirations.dates });
+          dispatch({ type: 'SET_STATUS', payload: { message: `✅ Loaded ${expirations.dates.length} expiration dates`, type: 'success' } });
           // Switch to symbol detail screen
           dispatch({ type: 'SET_SCREEN', payload: 'symbolDetail' });
         }

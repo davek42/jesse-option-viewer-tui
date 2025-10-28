@@ -146,80 +146,112 @@ export class AlpacaClient {
   /**
    * Get available expiration dates for options on a symbol
    * Uses v2/options/contracts endpoint with pagination to fetch all available expirations
+   * @param symbol Stock symbol
+   * @param onProgress Optional callback for progress updates (batch number, total dates found)
    */
-  async getExpirationDates(symbol: string): Promise<ExpirationDates | null> {
+  async getExpirationDates(
+    symbol: string,
+    onProgress?: (batchNum: number, totalDates: number, maxBatches: number) => void
+  ): Promise<ExpirationDates | null> {
     try {
       logger.api('GET', `/options/expirations/${symbol}`);
 
       const expirationDates = new Set<string>();
-      let pageToken: string | null = null;
-      let pageCount = 0;
-      const MAX_PAGES = 5; // Limit pagination to prevent excessive API calls
-      const MAX_EXPIRATION_REQUESTS = 3; // Request additional date ranges
+      const MAX_PAGES_PER_BATCH = 50; // Max pages to fetch per date range batch
 
       logger.info(`🗓️  Fetching expiration dates for ${symbol.toUpperCase()}...`);
 
-      // Fetch contracts with pagination
-      let expirationRequests = 0;
+      // Smart batching: Define date ranges strategically instead of sequential iteration
+      // This reduces total batches needed from ~10 to ~5 for most symbols
+      const today = new Date();
+      const dateRanges: Array<{ start: Date | null; end: Date; label: string }> = [
+        { start: null, end: new Date(today.getFullYear(), today.getMonth() + 1, 0), label: 'Near-term (0-1 month)' },
+        { start: new Date(today.getFullYear(), today.getMonth() + 1, 1), end: new Date(today.getFullYear(), today.getMonth() + 3, 0), label: '1-3 months' },
+        { start: new Date(today.getFullYear(), today.getMonth() + 3, 1), end: new Date(today.getFullYear(), today.getMonth() + 6, 0), label: '3-6 months' },
+        { start: new Date(today.getFullYear(), today.getMonth() + 6, 1), end: new Date(today.getFullYear(), today.getMonth() + 12, 0), label: '6-12 months' },
+        { start: new Date(today.getFullYear(), today.getMonth() + 12, 1), end: new Date(today.getFullYear() + 2, today.getMonth(), 0), label: '1-2 years' },
+      ];
 
-      do {
-        const paginationParam = pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : '';
-        let url = `${this.tradingBaseUrl}/v2/options/contracts?underlying_symbols=${symbol.toUpperCase()}${paginationParam}`;
+      const totalBatches = dateRanges.length;
 
-        // After first page, request additional future expirations
-        if (expirationRequests > 0 && expirationDates.size > 0) {
-          const sortedExpirations = Array.from(expirationDates).sort();
-          const latestExpirationDate = sortedExpirations[sortedExpirations.length - 1];
+      // Fetch each batch
+      for (let batchIndex = 0; batchIndex < dateRanges.length; batchIndex++) {
+        const range = dateRanges[batchIndex]!;
+        const batchNum = batchIndex + 1;
 
-          if (latestExpirationDate) {
-            const nextDate = new Date(latestExpirationDate);
-            nextDate.setDate(nextDate.getDate() + 1);
-            const nextDateString = nextDate.toISOString().split('T')[0];
+        // Build URL with date range filter
+        const startDateStr = range.start ? range.start.toISOString().split('T')[0] : null;
+        const endDateStr = range.end.toISOString().split('T')[0];
 
-            url = `${this.tradingBaseUrl}/v2/options/contracts?underlying_symbols=${symbol.toUpperCase()}&expiration_date_gte=${nextDateString}${paginationParam}`;
-          }
-        }
+        const dateFilter = startDateStr
+          ? `&expiration_date_gte=${startDateStr}&expiration_date_lte=${endDateStr}`
+          : `&expiration_date_lte=${endDateStr}`;
 
-        const response = await rateLimitedFetch(url, {
-          headers: this.getAuthHeaders(),
-        });
+        const baseUrl = `${this.tradingBaseUrl}/v2/options/contracts?underlying_symbols=${symbol.toUpperCase()}${dateFilter}`;
 
-        if (!response.ok) {
-          logger.error(`API error: ${response.status} ${response.statusText}`);
-          break;
-        }
+        logger.info(`📅 Fetching batch ${batchNum}/${totalBatches}: ${range.label}`);
 
-        const data = (await response.json()) as any;
-        pageToken = data.next_page_token || null;
+        // Paginate through this date range batch
+        let pageToken: string | null = null;
+        let pagesInBatch = 0;
+        const expirationsBeforeBatch = expirationDates.size;
 
-        // Extract expiration dates from contracts
-        if (data.option_contracts && Array.isArray(data.option_contracts)) {
-          data.option_contracts.forEach((contract: any) => {
-            if (contract.expiration_date) {
-              expirationDates.add(contract.expiration_date);
-            }
+        do {
+          const paginationParam = pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : '';
+          const url = `${baseUrl}${paginationParam}`;
+
+          const response = await rateLimitedFetch(url, {
+            headers: this.getAuthHeaders(),
           });
 
-          logger.debug(
-            `Fetched page ${pageCount + 1}: ${data.option_contracts.length} contracts, ${expirationDates.size} unique expirations`
-          );
+          if (!response.ok) {
+            logger.error(`API error: ${response.status} ${response.statusText}`);
+            break;
+          }
+
+          const data = (await response.json()) as any;
+          pageToken = data.next_page_token || null;
+
+          // Extract expiration dates from contracts
+          if (data.option_contracts && Array.isArray(data.option_contracts)) {
+            data.option_contracts.forEach((contract: any) => {
+              if (contract.expiration_date) {
+                expirationDates.add(contract.expiration_date);
+              }
+            });
+          }
+
+          pagesInBatch++;
+
+          // Reduced delay for faster loading (150ms instead of 300ms)
+          if (pageToken && pagesInBatch < MAX_PAGES_PER_BATCH) {
+            await new Promise((resolve) => setTimeout(resolve, 150));
+          }
+        } while (pageToken && pagesInBatch < MAX_PAGES_PER_BATCH);
+
+        const newExpirations = expirationDates.size - expirationsBeforeBatch;
+        logger.info(
+          `✅ Batch ${batchNum}/${totalBatches} complete: +${newExpirations} new dates (total: ${expirationDates.size})`
+        );
+
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress(batchNum, expirationDates.size, totalBatches);
         }
 
-        pageCount++;
-        expirationRequests++;
-
-        // Add delay between pagination requests to avoid rate limits
-        if (pageToken && pageCount < MAX_PAGES) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
+        // Early exit if this batch found no new expirations
+        if (newExpirations === 0 && batchNum > 2) {
+          logger.info(`✅ No new expirations in batch ${batchNum}, stopping early`);
+          break;
         }
-      } while (pageToken && pageCount < MAX_PAGES && expirationRequests < MAX_EXPIRATION_REQUESTS);
+      }
 
       const sortedExpirations = Array.from(expirationDates).sort();
 
       // Filter out past expiration dates (only show today or future dates)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset to start of day for comparison
-      const todayString = today.toISOString().split('T')[0]!; // Format: YYYY-MM-DD
+      const todayForFilter = new Date();
+      todayForFilter.setHours(0, 0, 0, 0); // Reset to start of day for comparison
+      const todayString = todayForFilter.toISOString().split('T')[0]!; // Format: YYYY-MM-DD
 
       logger.debug(`📅 Today's date for filtering: ${todayString}`);
       logger.debug(`📅 All expirations before filtering: ${sortedExpirations.join(', ')}`);

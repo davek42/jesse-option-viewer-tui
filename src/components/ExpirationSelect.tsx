@@ -1,4 +1,4 @@
-// AIDEV-NOTE: Expiration date selection component with keyboard navigation
+// AIDEV-NOTE: Expiration date selection component with keyboard navigation and scrolling (Phase 2)
 
 import React from 'react';
 import { Box, Text } from 'ink';
@@ -19,7 +19,7 @@ interface ExpirationSelectProps {
   /** Whether this component has focus for keyboard input */
   isFocused?: boolean;
 
-  /** Maximum number of expirations to display at once (default: 8) */
+  /** Maximum number of expirations to display at once (default: 15) */
   maxVisible?: number;
 }
 
@@ -67,8 +67,9 @@ function formatExpirationDate(dateStr: string): {
 /**
  * ExpirationSelect Component
  *
- * Displays a list of available expiration dates with keyboard navigation.
+ * Displays a scrollable list of available expiration dates with keyboard navigation.
  * Shows days until expiration and highlights selected/focused items.
+ * Supports scrolling when there are more expirations than can fit on screen.
  */
 export function ExpirationSelect({
   expirations,
@@ -76,7 +77,7 @@ export function ExpirationSelect({
   onSelect: _onSelect,
   highlightedIndex = 0,
   isFocused = false,
-  maxVisible = 8,
+  maxVisible = 15,
 }: ExpirationSelectProps) {
   if (expirations.length === 0) {
     return (
@@ -86,25 +87,59 @@ export function ExpirationSelect({
     );
   }
 
-  // Limit displayed expirations
-  const displayedExpirations = expirations.slice(0, maxVisible);
-  const hasMore = expirations.length > maxVisible;
+  // Calculate scroll window to keep highlighted item visible
+  // Strategy: Keep highlighted item in the middle when possible
+  const totalItems = expirations.length;
+  const needsScrolling = totalItems > maxVisible;
+
+  let scrollOffset = 0;
+  if (needsScrolling) {
+    // Try to keep highlighted item in the middle of the visible window
+    const middlePosition = Math.floor(maxVisible / 2);
+    scrollOffset = Math.max(0, highlightedIndex - middlePosition);
+
+    // Don't scroll past the end
+    const maxOffset = totalItems - maxVisible;
+    scrollOffset = Math.min(scrollOffset, maxOffset);
+  }
+
+  // Calculate visible range
+  const visibleStart = scrollOffset;
+  const visibleEnd = Math.min(scrollOffset + maxVisible, totalItems);
+  const displayedExpirations = expirations.slice(visibleStart, visibleEnd);
+
+  // Scroll indicators
+  const hasItemsAbove = scrollOffset > 0;
+  const hasItemsBelow = visibleEnd < totalItems;
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      {/* Header */}
-      <Box marginBottom={1}>
+      {/* Header with scroll position */}
+      <Box marginBottom={1} justifyContent="space-between">
         <Text bold color={isFocused ? 'cyan' : 'white'}>
-          📅 Expiration Dates {isFocused && <Text color="yellow">(↑↓ to navigate, Enter to select)</Text>}
+          📅 Expiration Dates {isFocused && <Text color="yellow">(k/j navigate, K/J jump 10)</Text>}
         </Text>
+        {needsScrolling && (
+          <Text dimColor>
+            Showing {visibleStart + 1}-{visibleEnd} of {totalItems}
+          </Text>
+        )}
       </Box>
+
+      {/* Scroll indicator - items above */}
+      {hasItemsAbove && (
+        <Box marginBottom={0} paddingLeft={1}>
+          <Text color="cyan" bold>▲ {scrollOffset} more above</Text>
+        </Box>
+      )}
 
       {/* Expiration list */}
       <Box flexDirection="column">
-        {displayedExpirations.map((expiration, index) => {
+        {displayedExpirations.map((expiration, displayIndex) => {
+          const actualIndex = visibleStart + displayIndex;
           const { formatted, daysUntil, isToday, isWeekly } = formatExpirationDate(expiration);
           const isSelected = expiration === selectedExpiration;
-          const isHighlighted = isFocused && index === highlightedIndex;
+          const isHighlighted = isFocused && actualIndex === highlightedIndex;
 
           // Determine styling
           let backgroundColor: string | undefined;
@@ -166,12 +201,10 @@ export function ExpirationSelect({
         })}
       </Box>
 
-      {/* More indicator */}
-      {hasMore && (
-        <Box marginTop={1}>
-          <Text dimColor>
-            ... and {expirations.length - maxVisible} more ({expirations.length} total)
-          </Text>
+      {/* Scroll indicator - items below */}
+      {hasItemsBelow && (
+        <Box marginTop={0} paddingLeft={1}>
+          <Text color="cyan" bold>▼ {totalItems - visibleEnd} more below</Text>
         </Box>
       )}
 
