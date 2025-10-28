@@ -20,6 +20,14 @@ import { getATMIndex } from './components/OptionChain.js';
 import { getAlpacaClient } from './lib/alpaca.js';
 import { logger } from './utils/logger.js';
 import { useTerminalSize, calculateSafeDisplayLimit } from './hooks/useTerminalSize.js';
+// AIDEV-NOTE: Refactored input handlers
+import { handleCommandMode } from './handlers/commandHandler.js';
+import { handleInputMode } from './handlers/inputHandler.js';
+import { handleHelpScreen } from './handlers/helpHandler.js';
+import { handleHomeScreen } from './handlers/homeHandler.js';
+import { handleSettingsScreen } from './handlers/settingsHandler.js';
+import { handleSavedStrategiesScreen } from './handlers/savedStrategiesHandler.js';
+import { handleOptionChainView } from './handlers/optionChainHandler.js';
 import {
   createBullCallSpread,
   createBearPutSpread,
@@ -588,7 +596,6 @@ function GlobalInputHandler() {
   const {
     currentScreen,
     mode,
-    inputBuffer,
     currentSymbol,
     availableExpirations,
     displayLimit,
@@ -611,143 +618,28 @@ function GlobalInputHandler() {
       return;
     }
 
-    // COMMAND MODE
+    // AIDEV-NOTE: Create handler context for extracted handlers
+    const handlerContext = {
+      state,
+      dispatch,
+      exit,
+      highlightedIndex,
+      setHighlightedIndex,
+      showGreeks,
+      setShowGreeks,
+    };
+
+    // COMMAND MODE - Delegate to extracted handler
     if (mode === 'command') {
-      if (key.escape) {
-        dispatch({ type: 'CLEAR_INPUT' });
-        dispatch({ type: 'SET_MODE', payload: 'navigation' });
-        return;
-      }
-
-      if (key.backspace || key.delete) {
-        dispatch({ type: 'DELETE_LAST_CHAR' });
-        return;
-      }
-
-      if (key.return) {
-        // Execute command
-        const command = state.commandBuffer.toLowerCase().trim();
-        logger.debug('Command entered:', command);
-
-        // Handle slash commands (Phase 3.3)
-        if (command === '/scroll up' || command === '/up') {
-          // Page up - jump 10 strikes
-          if (currentScreen === 'optionChainView' && optionChain) {
-            const newIndex = Math.max(0, highlightedIndex - 10);
-            setHighlightedIndex(newIndex);
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Scrolled up 10 strikes', type: 'info' } });
-          } else {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
-          }
-        } else if (command === '/scroll down' || command === '/down') {
-          // Page down - jump 10 strikes
-          if (currentScreen === 'optionChainView' && optionChain) {
-            setHighlightedIndex((prev) => prev + 10);
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Scrolled down 10 strikes', type: 'info' } });
-          } else {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
-          }
-        } else if (command === '/atm' || command === '/a') {
-          // Jump to ATM
-          if (currentScreen === 'optionChainView' && optionChain) {
-            const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
-            setHighlightedIndex(atmIndex);
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to ATM strike', type: 'success' } });
-          } else {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
-          }
-        } else if (command === '/top' || command === '/t') {
-          // Jump to top (first strike)
-          if (currentScreen === 'optionChainView') {
-            setHighlightedIndex(0);
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to top', type: 'info' } });
-          } else {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
-          }
-        } else if (command === '/bottom' || command === '/b') {
-          // Jump to bottom (last strike)
-          if (currentScreen === 'optionChainView' && optionChain) {
-            const displayStrikes = optionChain.calls.length > 0 ? optionChain.calls.length : 40;
-            setHighlightedIndex(displayStrikes - 1);
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to bottom', type: 'info' } });
-          } else {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Command only works in Option Chain View', type: 'warning' } });
-          }
-        } else if (command === '/help' || command === '/h' || command === '/?') {
-          // Show help screen (global command)
-          dispatch({ type: 'SET_SCREEN', payload: 'help' });
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Showing help screen', type: 'info' } });
-        } else if (command === '/settings' || command === '/config') {
-          // Show settings screen (Task #18)
-          dispatch({ type: 'SET_SCREEN', payload: 'settings' });
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Showing settings screen', type: 'info' } });
-        } else if (command === '/paper') {
-          // Switch to paper mode (Task #18)
-          if (state.tradingMode === 'paper') {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Already in PAPER mode', type: 'info' } });
-          } else {
-            dispatch({ type: 'REQUEST_MODE_SWITCH', payload: 'paper' });
-          }
-        } else if (command === '/live') {
-          // Switch to live mode (Task #18)
-          if (!state.liveCredentialsConfigured) {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Live credentials not configured', type: 'error' } });
-          } else if (state.tradingMode === 'live') {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Already in LIVE mode', type: 'info' } });
-          } else {
-            dispatch({ type: 'REQUEST_MODE_SWITCH', payload: 'live' });
-          }
-        } else if (command === '/mode') {
-          // Toggle mode (Task #18)
-          const targetMode = state.tradingMode === 'paper' ? 'live' : 'paper';
-          if (targetMode === 'live' && !state.liveCredentialsConfigured) {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Live credentials not configured', type: 'error' } });
-          } else {
-            dispatch({ type: 'REQUEST_MODE_SWITCH', payload: targetMode });
-          }
-        } else if (command.startsWith('/')) {
-          dispatch({ type: 'SET_STATUS', payload: { message: `Unknown command: ${command}`, type: 'error' } });
-        }
-
-        dispatch({ type: 'CLEAR_INPUT' });
-        dispatch({ type: 'SET_MODE', payload: 'navigation' });
-        return;
-      }
-
-      if (input && !key.ctrl && !key.meta) {
-        dispatch({ type: 'APPEND_INPUT', payload: input });
-      }
-      return;
+      const result = handleCommandMode(input, key, handlerContext);
+      if (result.handled) return;
     }
 
-    // INPUT MODE
+    // INPUT MODE - Delegate to extracted handler
     if (mode === 'input') {
-      if (key.escape) {
-        dispatch({ type: 'CLEAR_INPUT' });
-        dispatch({ type: 'SET_MODE', payload: 'navigation' });
-        dispatch({ type: 'SET_STATUS', payload: { message: 'Cancelled', type: 'info' } });
-        return;
-      }
-
-      if (key.return) {
-        const symbol = inputBuffer.trim().toUpperCase();
-        if (symbol) {
-          handleSymbolEntry(symbol);
-        }
-        dispatch({ type: 'CLEAR_INPUT' });
-        dispatch({ type: 'SET_MODE', payload: 'navigation' });
-        return;
-      }
-
-      if (key.backspace || key.delete) {
-        dispatch({ type: 'DELETE_LAST_CHAR' });
-        return;
-      }
-
-      if (input && !key.ctrl && !key.meta) {
-        dispatch({ type: 'APPEND_INPUT', payload: input });
-      }
-      return;
+      const inputContext = { ...handlerContext, onSymbolEntry: handleSymbolEntry };
+      const result = handleInputMode(input, key, inputContext as any);
+      if (result.handled) return;
     }
 
     // NAVIGATION MODE
@@ -778,19 +670,9 @@ function GlobalInputHandler() {
       return;
     }
 
-    // Home screen navigation
-    if (currentScreen === 'home') {
-      if (input === 's') {
-        dispatch({ type: 'SET_MODE', payload: 'input' });
-        dispatch({ type: 'SET_STATUS', payload: { message: 'Enter stock symbol', type: 'info' } });
-      } else if (input === 'c') {
-        // Settings (Task #18)
-        dispatch({ type: 'SET_SCREEN', payload: 'settings' });
-      } else if (input === 'q') {
-        logger.info('👋 Exiting application...');
-        exit();
-      }
-    }
+    // Home screen navigation - Delegate to extracted handler
+    const homeResult = handleHomeScreen(input, key, handlerContext);
+    if (homeResult.handled) return;
 
     // Symbol Detail screen navigation
     if (currentScreen === 'symbolDetail') {
@@ -1192,286 +1074,21 @@ function GlobalInputHandler() {
       }
     }
 
-    // Option Chain View screen navigation
-    if (currentScreen === 'optionChainView') {
-      // Calculate total strikes for boundary checking
-      const totalStrikes = optionChain
-        ? [...new Set([...optionChain.calls.map(c => c.strikePrice), ...optionChain.puts.map(p => p.strikePrice)])].length
-        : 0;
+    // Option Chain View screen navigation - Delegate to extracted handler
+    const optionChainResult = handleOptionChainView(input, key, handlerContext);
+    if (optionChainResult.handled) return;
 
-      // Single-line navigation
-      if (key.upArrow || input === 'k') {
-        setHighlightedIndex((prev) => Math.max(0, prev - 1));
-      } else if (key.downArrow || input === 'j') {
-        setHighlightedIndex((prev) => Math.min(totalStrikes - 1, prev + 1));
-      }
+    // Saved Strategies screen navigation - Delegate to extracted handler
+    const savedStrategiesResult = handleSavedStrategiesScreen(input, key, handlerContext);
+    if (savedStrategiesResult.handled) return;
 
-      // Jump to ATM (Phase 3.3) - 'a' key
-      else if (input === 'a') {
-        if (optionChain) {
-          const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
-          setHighlightedIndex(atmIndex);
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to ATM strike', type: 'success' } });
-        }
-      }
+    // Help screen navigation - Delegate to extracted handler
+    const helpResult = handleHelpScreen(input, key, handlerContext);
+    if (helpResult.handled) return;
 
-      // Jump to top (Phase 3.3) - Ctrl+Up
-      else if (key.ctrl && key.upArrow) {
-        setHighlightedIndex(0);
-        dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to top', type: 'info' } });
-      }
-
-      // Jump to bottom (Phase 3.3) - Ctrl+Down
-      else if (key.ctrl && key.downArrow) {
-        if (optionChain) {
-          // Calculate max index based on display
-          const displayStrikes = optionChain.calls.length > 0 ? optionChain.calls.length : 40;
-          setHighlightedIndex(displayStrikes - 1);
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Jumped to bottom', type: 'info' } });
-        }
-      }
-
-      // Display limit cycling
-      else if (input === 'l') {
-        const limits = [10, 40, -1]; // -1 means ALL
-        const currentIndex = limits.indexOf(displayLimit);
-        const nextIndex = (currentIndex + 1) % limits.length;
-        const newLimit = limits[nextIndex]!;
-        dispatch({ type: 'SET_DISPLAY_LIMIT', payload: newLimit });
-        dispatch({
-          type: 'SET_STATUS',
-          payload: { message: `Display limit: ${newLimit === -1 ? 'ALL' : newLimit}`, type: 'success' },
-        });
-      }
-
-      // Toggle Greeks
-      else if (input === 'g') {
-        setShowGreeks((prev) => !prev);
-        dispatch({
-          type: 'SET_STATUS',
-          payload: { message: `Greeks ${showGreeks ? 'hidden' : 'visible'}`, type: 'info' },
-        });
-      }
-
-      // Go back
-      else if (input === 'q') {
-        // Clear screen before going back (Phase 3.3 - Fix screen overlap)
-        process.stdout.write('\x1Bc');
-        dispatch({ type: 'GO_BACK' });
-        setHighlightedIndex(0);
-      }
-    }
-
-    // Saved Strategies screen navigation
-    if (currentScreen === 'savedStrategies') {
-      // Navigation keys
-      if (key.upArrow || input === 'k') {
-        setHighlightedIndex((prev) => Math.max(0, prev - 1));
-      } else if (key.downArrow || input === 'j') {
-        const maxIndex = state.savedStrategies.length - 1;
-        setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
-      }
-
-      // Delete strategy
-      else if (input === 'x') {
-        const strategy = state.savedStrategies[highlightedIndex];
-        if (strategy) {
-          dispatch({ type: 'REMOVE_STRATEGY', payload: strategy.id });
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy removed', type: 'success' } });
-          // Adjust highlighted index if needed
-          if (highlightedIndex >= state.savedStrategies.length - 1) {
-            setHighlightedIndex(Math.max(0, state.savedStrategies.length - 2));
-          }
-        }
-      }
-
-      // Go back
-      else if (input === 'q') {
-        // Clear screen before going back (Phase 3.3 - Fix screen overlap)
-        process.stdout.write('\x1Bc');
-        dispatch({ type: 'GO_BACK' });
-        setHighlightedIndex(0);
-      }
-    }
-
-    // Help screen navigation
-    if (currentScreen === 'help') {
-      // Go back
-      if (input === 'q') {
-        dispatch({ type: 'GO_BACK' });
-      }
-    }
-
-    // Settings screen navigation (Task #18)
-    if (currentScreen === 'settings') {
-      if (input === 'q') {
-        // Go back
-        dispatch({ type: 'GO_BACK' });
-      } else if (input === 'm' || input === 'M') {
-        // Switch mode
-        const targetMode = state.tradingMode === 'paper' ? 'live' : 'paper';
-
-        // Check if switching to live but credentials not configured
-        if (targetMode === 'live' && !state.liveCredentialsConfigured) {
-          dispatch({
-            type: 'SET_STATUS',
-            payload: {
-              message: 'Live credentials not configured. Check .env.local file.',
-              type: 'error',
-            },
-          });
-        } else {
-          // Request mode switch (triggers confirmation dialog)
-          dispatch({ type: 'REQUEST_MODE_SWITCH', payload: targetMode });
-        }
-      }
-    }
-
-    // Legacy optionChain screen navigation (kept for backward compatibility if needed)
-    // This is now handled by symbolDetail + strategy builder modal
-    /*
-    if (currentScreen === 'optionChain') {
-      // Strategy Builder Mode
-      if (strategyBuilderActive) {
-        // Navigation keys
-        if (key.upArrow || input === 'k') {
-          setHighlightedIndex((prev) => Math.max(0, prev - 1));
-        } else if (key.downArrow || input === 'j') {
-          const availableCalls = optionChain?.calls || [];
-          const filteredCalls = builderStep === 'long'
-            ? availableCalls
-            : availableCalls.filter(call => selectedLongCall ? call.strikePrice > selectedLongCall.strikePrice : true);
-          const maxIndex = Math.min(filteredCalls.length - 1, 9); // Limit to first 10
-          setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
-        }
-        // Select option or save strategy
-        else if (key.return) {
-          // Save strategy if both calls are selected
-          if (selectedLongCall && selectedShortCall) {
-            const symbol = state.currentSymbol;
-            if (symbol) {
-              const strategy = createBullCallSpread(symbol, selectedLongCall, selectedShortCall, 1);
-              if (strategy) {
-                // Show confirmation prompt instead of saving directly
-                dispatch({ type: 'SHOW_SAVE_CONFIRMATION', payload: strategy });
-                dispatch({ type: 'SET_STATUS', payload: { message: 'Review strategy and press Enter to save, or Esc to cancel', type: 'info' } });
-                logger.info(`📋 Showing save confirmation for ${strategy.type}`);
-              } else {
-                dispatch({ type: 'SET_STATUS', payload: { message: 'Invalid strategy configuration', type: 'error' } });
-              }
-            }
-          }
-          // Select long or short call
-          else {
-            const availableCalls = optionChain?.calls || [];
-            const filteredCalls = builderStep === 'long'
-              ? availableCalls
-              : availableCalls.filter(call => selectedLongCall ? call.strikePrice > selectedLongCall.strikePrice : true);
-            const selectedCall = filteredCalls[highlightedIndex];
-
-            if (selectedCall) {
-              if (builderStep === 'long') {
-                dispatch({ type: 'SET_LONG_CALL', payload: selectedCall });
-                dispatch({ type: 'SET_BUILDER_STEP', payload: 'short' });
-                setHighlightedIndex(0);
-                dispatch({ type: 'SET_STATUS', payload: { message: 'Long call selected. Now select SHORT call (higher strike)', type: 'success' } });
-              } else if (builderStep === 'short') {
-                dispatch({ type: 'SET_SHORT_CALL', payload: selectedCall });
-                dispatch({ type: 'SET_STATUS', payload: { message: 'Short call selected. Press Enter again to SAVE strategy', type: 'success' } });
-              }
-            }
-          }
-        }
-        // Cancel builder
-        else if (key.escape || input === 'q') {
-          dispatch({ type: 'DEACTIVATE_STRATEGY_BUILDER' });
-          setHighlightedIndex(0);
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Strategy builder cancelled', type: 'info' } });
-        }
-      }
-      // Normal Navigation Mode
-      else {
-        // Navigation keys
-        if (key.upArrow || input === 'k') {
-          setHighlightedIndex((prev) => Math.max(0, prev - 1));
-        } else if (key.downArrow || input === 'j') {
-          const maxIndex = optionChainFocus === 'expiration' ? availableExpirations.length - 1 : 40;
-          setHighlightedIndex((prev) => Math.min(maxIndex, prev + 1));
-        }
-
-        // Selection
-        else if (key.return) {
-          if (optionChainFocus === 'expiration' && availableExpirations[highlightedIndex]) {
-            // Selection is handled by the OptionChainScreen component
-          }
-        }
-
-        // Activate strategy builder
-        else if (input === 'b') {
-          if (optionChain && optionChain.calls.length > 0) {
-            logger.info('🏗️ Activating Bull Call Spread Builder');
-            dispatch({ type: 'ACTIVATE_STRATEGY_BUILDER' });
-            setHighlightedIndex(0);
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Bull Call Spread Builder: Select LONG call (buy)', type: 'info' } });
-          } else {
-            dispatch({ type: 'SET_STATUS', payload: { message: 'Load option chain first', type: 'warning' } });
-          }
-        }
-
-        // View saved strategies
-        else if (input === 'v') {
-          setOptionChainFocus('expiration'); // For now, just acknowledge
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Saved strategies view (use ↑↓ to navigate)', type: 'info' } });
-        }
-
-        // Focus switching
-        else if (input === 'e') {
-          setOptionChainFocus('expiration');
-          setHighlightedIndex(0);
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Focus: Expiration dates', type: 'info' } });
-        } else if (input === 'o') {
-          setOptionChainFocus('optionChain');
-          setHighlightedIndex(0);
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Focus: Option chain', type: 'info' } });
-        }
-
-        // Display limit cycling
-        else if (input === 'l') {
-          const limits = [10, 40, -1]; // -1 means ALL
-          const currentIndex = limits.indexOf(displayLimit);
-          const nextIndex = (currentIndex + 1) % limits.length;
-          const newLimit = limits[nextIndex]!;
-          dispatch({ type: 'SET_DISPLAY_LIMIT', payload: newLimit });
-          dispatch({
-            type: 'SET_STATUS',
-            payload: { message: `Display limit: ${newLimit === -1 ? 'ALL' : newLimit}`, type: 'success' },
-          });
-        }
-
-        // Toggle Greeks
-        else if (input === 'g') {
-          setShowGreeks((prev) => !prev);
-          dispatch({
-            type: 'SET_STATUS',
-            payload: { message: `Greeks ${showGreeks ? 'hidden' : 'visible'}`, type: 'info' },
-          });
-        }
-
-        // Symbol entry
-        else if (input === 's') {
-          dispatch({ type: 'SET_MODE', payload: 'input' });
-          dispatch({ type: 'SET_STATUS', payload: { message: 'Enter stock symbol', type: 'info' } });
-        }
-
-        // Go back
-        else if (input === 'q') {
-          dispatch({ type: 'GO_BACK' });
-          setHighlightedIndex(0);
-          setOptionChainFocus('expiration');
-        }
-      }
-    }
-    */
+    // Settings screen navigation - Delegate to extracted handler
+    const settingsResult = handleSettingsScreen(input, key, handlerContext);
+    if (settingsResult.handled) return;
   });
 
   // Symbol entry handler
