@@ -108,6 +108,50 @@ const getMaxVisibleExpirations = (): number => {
 
 ---
 
+### 5. Strategy Selector (Strategy Builder Modal)
+
+**Full Mode (40+ lines):**
+```
+╔════════════════════════════════════════════╗
+║ 🏗️  Strategy Builder - Choose Strategy    ║
+║                                            ║
+║ ↑↓/j/k Navigate | Enter Select | Esc Cancel ║
+║                                            ║
+║ ┌────────────────────────────────────────┐ ║
+║ │ ▶ Bull Call Spread     📈 Bullish     │ ║
+║ │    Limited risk bullish strategy      │ ║
+║ │    Risk: Limited | Legs: 2 | ⭐ Easy  │ ║
+║ └────────────────────────────────────────┘ ║
+║                                            ║
+║   Bear Put Spread        📉 Bearish        ║
+║   ...                                      ║
+║                                            ║
+║ Select a strategy to begin building...    ║
+╚════════════════════════════════════════════╝
+```
+**Space per strategy:** 5-6 lines (name + description + characteristics + border)
+**Total:** 45-50 lines for 8 strategies
+
+**Compact Mode (<40 lines):**
+```
+╔════════════════════════════════════════╗
+║ 🏗️  Strategy Builder                   ║
+║ ▶ Bull Call Spread - 📈 Bullish | ⭐ Easy ║
+║   Bear Put Spread - 📉 Bearish | ⭐ Easy  ║
+║   Bull Put Spread - 📈 Bullish (Credit) | ⭐ Easy ║
+║   Bear Call Spread - 📉 Bearish (Credit) | ⭐ Easy ║
+║   Diagonal Call - 📈 Bullish + Time | ⭐⭐ Medium ║
+║   Iron Condor - ↔️  Neutral | ⭐⭐⭐ Complex ║
+║   Long Straddle - 💥 High Vol | ⭐⭐ Medium ║
+║   Covered Call - 📈 Income | ⭐ Easy ║
+╚════════════════════════════════════════╝
+```
+**Space per strategy:** 1 line
+**Total:** 12-14 lines for 8 strategies
+**Space saved:** 32-36 lines
+
+---
+
 ## Space Savings Summary
 
 | Element | Full Mode | Compact Mode | Saved |
@@ -115,8 +159,10 @@ const getMaxVisibleExpirations = (): number => {
 | **Stock Quote** | 3 lines | 1 line | 2 lines |
 | **Expirations** | More reserved | Less reserved | ~7 lines |
 | **Strategies (empty)** | 6 lines | 0 lines | 6 lines |
+| **Strategy Selector** | 45-50 lines | 12-14 lines | ~35 lines |
 | **Margins** | Generous | Tight | 2 lines |
-| **TOTAL SAVED** | - | - | **~17 lines** |
+| **TOTAL SAVED** | - | - | **~17 lines (SymbolDetail)** |
+|  |  |  | **~35 lines (StrategySelector)** |
 
 **Note:** Keyboard shortcuts are rendered once by App.tsx for all screens, avoiding duplication.
 
@@ -209,9 +255,20 @@ SPY @ $687.08 ▲ $2.15 (0.31%) Vol: 45.2M
 **`src/screens/SymbolDetailScreen.tsx`**
 - Detects terminal height using `process.stdout.rows`
 - Calculates `compactMode` boolean based on 40-line threshold
-- Dynamically calculates `maxVisible` for expiration list
+- Dynamically calculates `maxVisible` for expiration list (7 in compact, up to 15 in full)
 - Conditionally renders UI elements based on mode
 - Logs terminal size and mode for debugging
+
+**`src/components/StrategySelector.tsx`**
+- Detects terminal height using `process.stdout.rows`
+- Calculates `compactMode` boolean based on 40-line threshold
+- Compact mode: Single line per strategy (name + bias + complexity)
+- Full mode: Multi-line with description and detailed characteristics
+- Hides instructions and footer help in compact mode
+
+**`src/App.tsx`**
+- Added screen clearing when switching to SymbolDetailScreen
+- Uses `process.stdout.write('\x1Bc')` for clean transitions
 
 ### Key Features
 
@@ -340,8 +397,11 @@ The responsive UI automatically adapts to terminal size, providing:
 ✅ **Rich UI on large screens** (45-60+ lines)
 ✅ **No user configuration required**
 ✅ **All functionality preserved**
-✅ **17 lines saved in compact mode**
-✅ **Dynamic expiration list sizing**
+✅ **Space savings in compact mode:**
+   - SymbolDetailScreen: 17 lines saved
+   - StrategySelector: 35 lines saved
+✅ **Dynamic expiration list sizing** (7 in compact, up to 15 in full)
 ✅ **No duplicate UI elements** - keyboard shortcuts shown once by App.tsx
+✅ **Clean screen transitions** - screen cleared when switching views
 
-**Result:** Application is now usable on split terminals, tmux panes, and small laptop screens while maintaining a rich experience on desktop monitors.
+**Result:** Application is now usable on split terminals, tmux panes, and small laptop screens (110x30) while maintaining a rich experience on desktop monitors.

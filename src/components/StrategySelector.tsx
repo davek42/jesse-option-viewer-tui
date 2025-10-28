@@ -1,4 +1,5 @@
 // AIDEV-NOTE: Strategy type selection menu (Task #9)
+// AIDEV-NOTE: Responsive UI - adapts to terminal size (compact mode below 40 lines)
 
 import React from 'react';
 import { Box, Text } from 'ink';
@@ -33,30 +34,41 @@ const AVAILABLE_STRATEGIES: StrategyType[] = [
  *
  * Displays a menu of available option strategies for the user to choose from.
  * User navigates with ↑↓/j/k and selects with Enter.
+ *
+ * Responsive UI:
+ * - Terminal height >= 40 lines: Full UI with descriptions and details
+ * - Terminal height < 40 lines: Compact mode - single line per strategy
  */
 export function StrategySelector({
   highlightedIndex,
   onSelect: _onSelect,
   onCancel: _onCancel,
 }: StrategySelectorProps) {
+  // Detect terminal size and determine UI mode
+  const terminalHeight = process.stdout.rows || 30;
+  const COMPACT_MODE_THRESHOLD = 40;
+  const compactMode = terminalHeight < COMPACT_MODE_THRESHOLD;
+
   return (
     <Box flexDirection="column" paddingX={1} borderStyle="double" borderColor="cyan">
       {/* Header */}
-      <Box marginBottom={1}>
+      <Box marginBottom={compactMode ? 0 : 1}>
         <Text bold color="cyan">
-          🏗️  Strategy Builder - Choose Strategy Type
+          🏗️  Strategy Builder {compactMode ? '' : '- Choose Strategy Type'}
         </Text>
       </Box>
 
-      {/* Instructions */}
-      <Box marginBottom={1}>
-        <Text dimColor>
-          ↑↓/j/k Navigate | Enter Select | Esc Cancel
-        </Text>
-      </Box>
+      {/* Instructions - hide in compact mode */}
+      {!compactMode && (
+        <Box marginBottom={1}>
+          <Text dimColor>
+            ↑↓/j/k Navigate | Enter Select | Esc Cancel
+          </Text>
+        </Box>
+      )}
 
       {/* Strategy list */}
-      <Box flexDirection="column" marginBottom={1}>
+      <Box flexDirection="column" marginBottom={compactMode ? 0 : 1}>
         {AVAILABLE_STRATEGIES.map((strategyType, index) => {
           const isHighlighted = index === highlightedIndex;
           const bgColor = isHighlighted ? 'cyan' : undefined;
@@ -68,50 +80,68 @@ export function StrategySelector({
           // Get strategy characteristics
           const characteristics = getStrategyCharacteristics(strategyType);
 
-          return (
-            <Box
-              key={strategyType}
-              flexDirection="column"
-              marginBottom={1}
-              borderStyle={isHighlighted ? 'single' : undefined}
-              borderColor={isHighlighted ? 'cyan' : undefined}
-              paddingX={1}
-            >
-              {/* Strategy name */}
-              <Box>
+          if (compactMode) {
+            // Compact mode: Single line per strategy
+            return (
+              <Box key={strategyType}>
                 <Text color={textColor} backgroundColor={bgColor} bold>
                   {isHighlighted ? '▶ ' : '  '}
                   {displayName}
                 </Text>
-                <Box marginLeft={2}>
-                  <Text color={characteristics.color}>{characteristics.bias}</Text>
+                <Text dimColor> - </Text>
+                <Text color={characteristics.color}>{characteristics.bias}</Text>
+                <Text dimColor> | {characteristics.complexity}</Text>
+              </Box>
+            );
+          } else {
+            // Full mode: Multi-line with details
+            return (
+              <Box
+                key={strategyType}
+                flexDirection="column"
+                marginBottom={1}
+                borderStyle={isHighlighted ? 'single' : undefined}
+                borderColor={isHighlighted ? 'cyan' : undefined}
+                paddingX={1}
+              >
+                {/* Strategy name */}
+                <Box>
+                  <Text color={textColor} backgroundColor={bgColor} bold>
+                    {isHighlighted ? '▶ ' : '  '}
+                    {displayName}
+                  </Text>
+                  <Box marginLeft={2}>
+                    <Text color={characteristics.color}>{characteristics.bias}</Text>
+                  </Box>
+                </Box>
+
+                {/* Description */}
+                <Box marginLeft={3}>
+                  <Text dimColor={!isHighlighted}>{description}</Text>
+                </Box>
+
+                {/* Characteristics */}
+                <Box marginLeft={3}>
+                  <Text dimColor>
+                    Risk: <Text color={characteristics.riskColor}>{characteristics.risk}</Text> |
+                    Legs: {characteristics.legs} |
+                    Complexity: {characteristics.complexity}
+                  </Text>
                 </Box>
               </Box>
-
-              {/* Description */}
-              <Box marginLeft={3}>
-                <Text dimColor={!isHighlighted}>{description}</Text>
-              </Box>
-
-              {/* Characteristics */}
-              <Box marginLeft={3}>
-                <Text dimColor>
-                  Risk: <Text color={characteristics.riskColor}>{characteristics.risk}</Text> |
-                  Legs: {characteristics.legs} |
-                  Complexity: {characteristics.complexity}
-                </Text>
-              </Box>
-            </Box>
-          );
+            );
+          }
         })}
       </Box>
 
-      {/* Footer help */}
-      <Box>
-        <Text dimColor>
-          Select a strategy to begin building your position
-        </Text>
-      </Box>
+      {/* Footer help - hide in compact mode */}
+      {!compactMode && (
+        <Box>
+          <Text dimColor>
+            Select a strategy to begin building your position
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
