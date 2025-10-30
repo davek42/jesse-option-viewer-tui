@@ -32,6 +32,12 @@
     - Runtime mode switching with UI
     - Safety features and confirmations
     - Visual indicators and warnings
+19. Add Alpaca IV Rank Calculator
+    - @alpaca-iv-rank-calculation-plan.md
+
+### Future Tasks
+100. Tasty Trade Integration    
+    - @astytrade-integration-plan.md
 
 ## Implementation Details
 
