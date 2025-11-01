@@ -7,17 +7,21 @@ import { getATMIndex } from '../components/OptionChain.js';
 /**
  * Handle command mode input (slash commands like /help, /atm, etc.)
  *
- * Commands:
+ * Global Commands (work on every screen):
+ * - /exit: Exit the application
+ * - /back: Go back to previous screen (same as 'q')
  * - /help, /h, /?: Show help screen
  * - /settings, /config: Show settings screen
  * - /paper: Switch to paper trading mode
  * - /live: Switch to live trading mode
  * - /mode: Toggle between paper and live
- * - /scroll up, /up: Scroll up 10 strikes (option chain only)
- * - /scroll down, /down: Scroll down 10 strikes (option chain only)
- * - /atm, /a: Jump to ATM strike (option chain only)
- * - /top, /t: Jump to top strike (option chain only)
- * - /bottom, /b: Jump to bottom strike (option chain only)
+ *
+ * Option Chain View Commands:
+ * - /scroll up, /up: Scroll up 10 strikes
+ * - /scroll down, /down: Scroll down 10 strikes
+ * - /atm, /a: Jump to ATM strike
+ * - /top, /t: Jump to top strike
+ * - /bottom, /b: Jump to bottom strike
  */
 export const handleCommandMode: InputHandler = (
   input: string,
@@ -69,8 +73,31 @@ export const handleCommandMode: InputHandler = (
  * Execute a slash command
  */
 function executeCommand(command: string, context: HandlerContext): void {
-  const { state, dispatch, setHighlightedIndex } = context;
+  const { state, dispatch, exit, setHighlightedIndex } = context;
   const { currentScreen, optionChain, displayLimit } = state;
+
+  // Global commands (work on every screen)
+  if (command === '/exit') {
+    logger.info('👋 Exiting application via /exit command...');
+    dispatch({ type: 'SET_STATUS', payload: { message: 'Exiting application...', type: 'info' } });
+    exit();
+    return;
+  }
+
+  if (command === '/back') {
+    // Go back to previous screen (same as 'q')
+    if (currentScreen === 'home') {
+      dispatch({ type: 'SET_STATUS', payload: { message: 'Already on home screen', type: 'info' } });
+    } else {
+      // Clear screen before going back (same behavior as 'q')
+      process.stdout.write('\x1Bc');
+      dispatch({ type: 'GO_BACK' });
+      setHighlightedIndex(0);
+      dispatch({ type: 'SET_STATUS', payload: { message: 'Going back...', type: 'info' } });
+      logger.info('📍 Going back to previous screen via /back command');
+    }
+    return;
+  }
 
   // Navigation commands (Option Chain View specific)
   if (command === '/scroll up' || command === '/up') {

@@ -60,9 +60,21 @@ export function HelpScreen() {
           </Box>
           <Box>
             <Box width={20}>
+              <Text color="cyan">/back</Text>
+            </Box>
+            <Text>Go back (command mode)</Text>
+          </Box>
+          <Box>
+            <Box width={20}>
               <Text color="cyan">Ctrl+C</Text>
             </Box>
             <Text>Exit application</Text>
+          </Box>
+          <Box>
+            <Box width={20}>
+              <Text color="cyan">/exit</Text>
+            </Box>
+            <Text>Exit application (command mode)</Text>
           </Box>
         </Box>
       </Box>
@@ -176,7 +188,7 @@ export function HelpScreen() {
             <Text>Enter command mode</Text>
           </Box>
           <Box marginTop={1}>
-            <Text dimColor>Commands: /atm, /scroll up, /scroll down, /top, /bottom</Text>
+            <Text dimColor>Commands: /atm, /scroll up, /scroll down, /top, /bottom, /exit, /back</Text>
           </Box>
         </Box>
       </Box>
