@@ -68,7 +68,13 @@ export function HelpScreen() {
             <Box width={20}>
               <Text color="cyan">/refresh</Text>
             </Box>
-            <Text>Refresh/redraw screen (command mode)</Text>
+            <Text>Refresh/redraw screen (UI only)</Text>
+          </Box>
+          <Box>
+            <Box width={20}>
+              <Text color="cyan">/reload</Text>
+            </Box>
+            <Text>Reload data from API</Text>
           </Box>
           <Box>
             <Box width={20}>
@@ -194,7 +200,7 @@ export function HelpScreen() {
             <Text>Enter command mode</Text>
           </Box>
           <Box marginTop={1}>
-            <Text dimColor>Commands: /atm, /scroll up, /scroll down, /top, /bottom, /refresh, /exit, /back</Text>
+            <Text dimColor>Commands: /atm, /scroll up, /scroll down, /top, /bottom, /refresh, /reload, /exit, /back</Text>
           </Box>
         </Box>
       </Box>
