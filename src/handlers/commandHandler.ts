@@ -10,6 +10,7 @@ import { getATMIndex } from '../components/OptionChain.js';
  * Global Commands (work on every screen):
  * - /exit: Exit the application
  * - /back: Go back to previous screen (same as 'q')
+ * - /refresh: Refresh/redraw the current screen
  * - /help, /h, /?: Show help screen
  * - /settings, /config: Show settings screen
  * - /paper: Switch to paper trading mode
@@ -96,6 +97,14 @@ function executeCommand(command: string, context: HandlerContext): void {
       dispatch({ type: 'SET_STATUS', payload: { message: 'Going back...', type: 'info' } });
       logger.info('📍 Going back to previous screen via /back command');
     }
+    return;
+  }
+
+  if (command === '/refresh') {
+    // Refresh/redraw the current screen (no data reload)
+    process.stdout.write('\x1Bc');
+    dispatch({ type: 'SET_STATUS', payload: { message: '🔄 Screen refreshed', type: 'success' } });
+    logger.info('🔄 Refreshing screen via /refresh command');
     return;
   }
 

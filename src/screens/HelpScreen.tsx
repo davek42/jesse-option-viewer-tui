@@ -66,6 +66,12 @@ export function HelpScreen() {
           </Box>
           <Box>
             <Box width={20}>
+              <Text color="cyan">/refresh</Text>
+            </Box>
+            <Text>Refresh/redraw screen (command mode)</Text>
+          </Box>
+          <Box>
+            <Box width={20}>
               <Text color="cyan">Ctrl+C</Text>
             </Box>
             <Text>Exit application</Text>
@@ -188,7 +194,7 @@ export function HelpScreen() {
             <Text>Enter command mode</Text>
           </Box>
           <Box marginTop={1}>
-            <Text dimColor>Commands: /atm, /scroll up, /scroll down, /top, /bottom, /exit, /back</Text>
+            <Text dimColor>Commands: /atm, /scroll up, /scroll down, /top, /bottom, /refresh, /exit, /back</Text>
           </Box>
         </Box>
       </Box>
