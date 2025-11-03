@@ -3,6 +3,7 @@
 
 import type { HandlerContext, HandlerResult } from './types.js';
 import { logger } from '../utils/logger.js';
+import { getATMIndex } from '../components/OptionChain.js';
 
 /**
  * Main handler for Strategy Builder modal
@@ -136,8 +137,6 @@ function handleStrategyTypeSelection(context: HandlerContext): HandlerResult {
     // Center on ATM for leg1 if showing all options
     const firstStep = selectedType === 'bull_call_spread' ? 'long' : 'leg1';
     if (shouldCenterOnATM(selectedType, firstStep) && optionChain) {
-      // Import getATMIndex from OptionChain component
-      const { getATMIndex } = require('../components/OptionChain.js');
       const atmIndex = getATMIndex(optionChain.calls, optionChain.puts, optionChain.underlyingPrice, displayLimit);
       setHighlightedIndex(atmIndex);
     } else {
