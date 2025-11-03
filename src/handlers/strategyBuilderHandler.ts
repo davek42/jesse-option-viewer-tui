@@ -4,6 +4,8 @@
 import type { HandlerContext, HandlerResult } from './types.js';
 import { logger } from '../utils/logger.js';
 import { getATMIndex } from '../components/OptionChain.js';
+import { handleStrategyNavigation } from './strategyBuildingNavigation.js';
+import { handleStrategyActions } from './strategyBuildingActions.js';
 
 /**
  * Main handler for Strategy Builder modal
@@ -162,10 +164,6 @@ function handleStrategyBuilding(
   key: any,
   context: HandlerContext
 ): HandlerResult {
-  // Import sub-handlers
-  const { handleStrategyNavigation } = require('./strategyBuildingNavigation.js');
-  const { handleStrategyActions } = require('./strategyBuildingActions.js');
-
   // Try navigation first
   const navResult = handleStrategyNavigation(input, key, context);
   if (navResult.handled) return navResult;
